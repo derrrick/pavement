@@ -8,6 +8,7 @@ public struct BrowserView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingPicker = false
+    @State private var cachedDecode = CachedDecode()
 
     private let columnsLayout: [GridItem] = [
         GridItem(.adaptive(minimum: 140, maximum: 220), spacing: 12)
@@ -37,8 +38,11 @@ public struct BrowserView: View {
                 HSplitView {
                     contactSheet
                         .frame(minWidth: 260, idealWidth: 360)
-                    PreviewPane(sourceURL: selection.primarySelectionURL)
-                        .frame(minWidth: 400)
+                    EditorView(
+                        item: selectedSingleItem,
+                        cachedDecode: cachedDecode
+                    )
+                    .frame(minWidth: 400)
                 }
             }
         }
@@ -151,6 +155,13 @@ public struct BrowserView: View {
         }
     }
 
+    /// The single item currently driving the editor pane. Returns nil while
+    /// no items are selected (Phase 2 doesn't render multi-select yet).
+    private var selectedSingleItem: SourceItem? {
+        guard let url = selection.primarySelectionURL else { return nil }
+        return selection.items.first { $0.url == url }
+    }
+
     private func updateColumnCount(for width: CGFloat) {
         // Mirror the columnsLayout adaptive math so up/down arrow keys jump
         // to the correct row neighbor.
@@ -162,6 +173,7 @@ public struct BrowserView: View {
         folderURL = folder
         errorMessage = nil
         isLoading = true
+        cachedDecode.clear()
 
         Task.detached(priority: .userInitiated) {
             do {
