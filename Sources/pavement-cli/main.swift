@@ -159,14 +159,38 @@ extension PavementCLI {
 
     struct Export: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Export a RAW using a named preset. (Phase 3)"
+            abstract: "Export a source via a named preset (instagram, web, print)."
         )
 
-        @Option(name: .long, help: "Preset name (instagram, web, print).") var preset: String
-        @Argument(help: "Source RAW file.") var source: String
+        @Option(name: .long, help: "Preset name: instagram, web, or print.") var preset: String
+        @Option(name: .long, help: "Override destination path.") var output: String?
+        @Argument(help: "Source file.") var source: String
 
         func run() throws {
-            throw ValidationError("export: not yet implemented (Phase 3)")
+            guard let presetEnum = ExportPreset(rawValue: preset.lowercased()) else {
+                throw ValidationError("Unknown preset '\(preset)' (use: instagram, web, print)")
+            }
+
+            let srcURL = URL(fileURLWithPath: (source as NSString).expandingTildeInPath)
+            let store = SidecarStore()
+            var recipe = try store.load(for: srcURL) ?? EditRecipe()
+            try Migrations.upgrade(&recipe)
+            Clamping.clampInPlace(&recipe)
+
+            let destination: URL
+            if let output {
+                destination = URL(fileURLWithPath: (output as NSString).expandingTildeInPath)
+            } else {
+                destination = Exporter.defaultDestination(source: srcURL, preset: presetEnum)
+            }
+
+            try Exporter().export(
+                recipe: recipe,
+                source: srcURL,
+                preset: presetEnum,
+                destination: destination
+            )
+            print("Wrote \(destination.path)")
         }
     }
 }
