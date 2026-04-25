@@ -110,15 +110,50 @@ extension PavementCLI {
 
     struct Render: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Apply a recipe JSON to a RAW and write the rendered output. (Phase 2)"
+            abstract: "Apply a recipe JSON to a source and write the rendered output."
         )
 
         @Option(name: .long, help: "Path to .pavement.json recipe.") var recipe: String
-        @Argument(help: "Source RAW file.") var source: String
-        @Argument(help: "Destination image.") var destination: String
+        @Argument(help: "Source RAW or JPEG.") var source: String
+        @Argument(help: "Destination image (PNG or JPG by extension).") var destination: String
 
         func run() throws {
-            throw ValidationError("render: not yet implemented (Phase 2)")
+            let recipeURL = URL(fileURLWithPath: (recipe as NSString).expandingTildeInPath)
+            let srcURL = URL(fileURLWithPath: (source as NSString).expandingTildeInPath)
+            let dstURL = URL(fileURLWithPath: (destination as NSString).expandingTildeInPath)
+
+            let data = try Data(contentsOf: recipeURL)
+            var recipeObj = try EditRecipe.makeDecoder().decode(EditRecipe.self, from: data)
+            try Migrations.upgrade(&recipeObj)
+            Clamping.clampInPlace(&recipeObj)
+
+            let decoded = try DecodeStage().decode(url: srcURL)
+            let rendered = PipelineGraph().apply(recipeObj, to: decoded)
+
+            let ctx = PipelineContext.shared.context
+            let ext = dstURL.pathExtension.lowercased()
+            switch ext {
+            case "jpg", "jpeg":
+                try ctx.writeJPEGRepresentation(
+                    of: rendered,
+                    to: dstURL,
+                    colorSpace: ColorSpaces.sRGB,
+                    options: [:]
+                )
+            case "png", "":
+                try ctx.writePNGRepresentation(
+                    of: rendered,
+                    to: dstURL,
+                    format: .RGBA8,
+                    colorSpace: ColorSpaces.sRGB
+                )
+            default:
+                throw ValidationError("Unsupported destination extension '\(ext)' (use .jpg or .png).")
+            }
+
+            let w = Int(rendered.extent.width.rounded())
+            let h = Int(rendered.extent.height.rounded())
+            print("Wrote \(dstURL.path) (\(w)x\(h))")
         }
     }
 

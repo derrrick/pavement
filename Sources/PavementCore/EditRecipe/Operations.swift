@@ -94,11 +94,18 @@ public struct LensCorrectionOp: Codable, Equatable {
 }
 
 public struct WhiteBalanceOp: Codable, Equatable {
+    public static let asShot   = "asShot"
+    public static let auto     = "auto"
+    public static let custom   = "custom"
+
     public var mode: String
     public var temp: Int
     public var tint: Int
 
-    public init(mode: String = "custom", temp: Int = 5500, tint: Int = 0) {
+    /// Default mode is `asShot` so a freshly-created recipe is a true no-op
+    /// against the source's recorded white balance. Switching to `custom`
+    /// activates the temp/tint values.
+    public init(mode: String = WhiteBalanceOp.asShot, temp: Int = 5500, tint: Int = 0) {
         self.mode = mode
         self.temp = temp
         self.tint = tint

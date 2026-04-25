@@ -74,7 +74,7 @@
       "rgb" : [ [0, 0], [1, 1] ]
     },
     "vignette" : { "amount" : 0, "feather" : 50, "midpoint" : 50, "roundness" : 0 },
-    "whiteBalance" : { "mode" : "custom", "temp" : 5500, "tint" : 0 }
+    "whiteBalance" : { "mode" : "asShot", "temp" : 5500, "tint" : 0 }
   },
   "schemaVersion" : 1,
   "source" : {

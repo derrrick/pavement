@@ -1,6 +1,33 @@
 import Foundation
+import CoreImage
 
-/// Composes filters in PLAN.md §4 order; returns CIImage. Phase 2.
-public final class PipelineGraph {
+/// Composes filters in PLAN.md §4 order. Stages not yet implemented are
+/// skipped; their fields on the recipe are no-ops until lit up.
+public struct PipelineGraph {
     public init() {}
+
+    public func apply(_ recipe: EditRecipe, to image: CIImage) -> CIImage {
+        var img = image
+
+        // §4 step 2: Lens correction — Phase 3.
+        // §4 step 3: White balance.
+        img = WhiteBalanceFilter().apply(image: img, op: recipe.operations.whiteBalance)
+
+        // §4 step 4: Highlight reconstruction — deferred (CIRAWFilter handles some).
+        // §4 step 5: Exposure.
+        img = ExposureFilter().apply(image: img, op: recipe.operations.exposure)
+
+        // §4 step 6: Tone controls (contrast/highlights/shadows; whites/blacks via curve).
+        img = ToneFilter().apply(image: img, op: recipe.operations.tone)
+
+        // §4 step 7: Tone curve — Phase 2.18.
+        // §4 step 8: HSL — Phase 2.17.
+        // §4 step 9: Color grading — Phase 6.
+        // §4 step 10: B&W — Phase 6.
+        // §4 step 11: Detail — Phase 6.
+        // §4 step 12: Effects — Phase 6.
+        // §4 step 13: Crop / rotate — Phase 3.
+
+        return img
+    }
 }
