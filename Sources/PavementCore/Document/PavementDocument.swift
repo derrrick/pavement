@@ -14,12 +14,61 @@ public final class PavementDocument {
     public var recipe: EditRecipe {
         didSet {
             guard recipe != oldValue else { return }
+            if !suppressUndoCapture {
+                undoStack.append(oldValue)
+                if undoStack.count > maxUndoDepth {
+                    undoStack.removeFirst()
+                }
+                redoStack.removeAll()
+            }
             recipe.modifiedAt = EditRecipe.now()
             handleLensCorrectionToggleIfNeeded(oldValue: oldValue)
             renderedImage = renderRecipe()
             scheduleSave()
             scheduleHistogram()
         }
+    }
+
+    /// Linear undo/redo stacks scoped to this document. Each recipe mutation
+    /// pushes the previous value onto undoStack; undo() pops it and pushes
+    /// the current value onto redoStack. Manipulations performed by the
+    /// stacks themselves are gated by `suppressUndoCapture` so they don't
+    /// recurse.
+    private var undoStack: [EditRecipe] = []
+    private var redoStack: [EditRecipe] = []
+    private var suppressUndoCapture = false
+    private let maxUndoDepth = 32
+
+    public var canUndo: Bool { !undoStack.isEmpty }
+    public var canRedo: Bool { !redoStack.isEmpty }
+
+    public func undo() {
+        guard let previous = undoStack.popLast() else { return }
+        let current = recipe
+        suppressUndoCapture = true
+        recipe = previous
+        suppressUndoCapture = false
+        redoStack.append(current)
+    }
+
+    public func redo() {
+        guard let next = redoStack.popLast() else { return }
+        let current = recipe
+        suppressUndoCapture = true
+        recipe = next
+        suppressUndoCapture = false
+        undoStack.append(current)
+    }
+
+    public func resetAdjustments() {
+        // Keep crop / lensCorrection / source — clear everything else.
+        var fresh = EditRecipe()
+        fresh.source = recipe.source
+        fresh.createdAt = recipe.createdAt
+        fresh.rating = recipe.rating
+        fresh.operations.crop = recipe.operations.crop
+        fresh.operations.lensCorrection = recipe.operations.lensCorrection
+        recipe = fresh
     }
 
     private func handleLensCorrectionToggleIfNeeded(oldValue: EditRecipe) {

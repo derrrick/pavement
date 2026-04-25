@@ -14,6 +14,12 @@ public struct EditRecipe: Equatable {
     /// favorites survive across sessions.
     public var rating: Int
 
+    /// Optional 3D LUT applied as the final color step. Set when the user
+    /// applies a Style that carries a LUT (imported .cube file). Embedded
+    /// in the sidecar so a photo's look is portable; sidecars only grow
+    /// when a LUT is actually in use.
+    public var lut: LUTData?
+
     /// Unknown top-level keys preserved on round-trip so a sidecar written by a
     /// future Pavement build (with new top-level fields) does not lose data
     /// when an older build loads, edits a known field, and re-saves it.
@@ -27,6 +33,7 @@ public struct EditRecipe: Equatable {
         operations: Operations = .init(),
         ai: AIMetadata = .init(),
         rating: Int = 0,
+        lut: LUTData? = nil,
         unknownKeys: [String: JSONValue] = [:]
     ) {
         self.schemaVersion = schemaVersion
@@ -36,6 +43,7 @@ public struct EditRecipe: Equatable {
         self.operations = operations
         self.ai = ai
         self.rating = rating
+        self.lut = lut
         self.unknownKeys = unknownKeys
     }
 
@@ -63,7 +71,7 @@ public struct EditRecipe: Equatable {
 
 extension EditRecipe: Codable {
     private static let knownKeys: Set<String> = [
-        "schemaVersion", "source", "createdAt", "modifiedAt", "operations", "ai", "rating"
+        "schemaVersion", "source", "createdAt", "modifiedAt", "operations", "ai", "rating", "lut"
     ]
 
     public init(from decoder: Decoder) throws {
@@ -76,6 +84,7 @@ extension EditRecipe: Codable {
         self.operations    = try container.decode(Operations.self, forKey: AnyCodingKey("operations"))
         self.ai            = try container.decode(AIMetadata.self, forKey: AnyCodingKey("ai"))
         self.rating        = (try? container.decodeIfPresent(Int.self, forKey: AnyCodingKey("rating"))) ?? 0
+        self.lut           = try? container.decodeIfPresent(LUTData.self, forKey: AnyCodingKey("lut"))
 
         var captured: [String: JSONValue] = [:]
         for key in container.allKeys where !Self.knownKeys.contains(key.stringValue) {
@@ -93,6 +102,9 @@ extension EditRecipe: Codable {
         try container.encode(operations,    forKey: AnyCodingKey("operations"))
         try container.encode(ai,            forKey: AnyCodingKey("ai"))
         try container.encode(rating,        forKey: AnyCodingKey("rating"))
+        if let lut {
+            try container.encode(lut, forKey: AnyCodingKey("lut"))
+        }
 
         for (rawKey, value) in unknownKeys {
             try container.encode(value, forKey: AnyCodingKey(rawKey))

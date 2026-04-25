@@ -38,6 +38,8 @@ public struct PipelineGraph {
         img = DetailFilter().apply(image: img, op: recipe.operations.detail)
         // §4 step 12: Effects — grain.
         img = GrainFilter().apply(image: img, op: recipe.operations.grain)
+        // Final color "look" pass — applied LUT (from imported .cube via Style).
+        img = LUTFilter().apply(image: img, lut: recipe.lut)
         // §4 step 13: Crop / rotate.
         img = CropFilter().apply(image: img, op: recipe.operations.crop)
 

@@ -9,6 +9,12 @@ public struct BrowserView: View {
     @State private var errorMessage: String?
     @State private var showingPicker = false
     @State private var showingExport = false
+    @State private var showingSaveStyle = false
+    @State private var showingManageStyles = false
+    @State private var showingImportXMP = false
+    @State private var showingImportLUT = false
+    @State private var importErrorMessage: String?
+    @State private var showingGrid = false
     @State private var cachedDecode = CachedDecode()
 
     private let columnsLayout: [GridItem] = [
@@ -19,7 +25,24 @@ public struct BrowserView: View {
 
     public var body: some View {
         VStack(spacing: 0) {
-            toolbar
+            HeaderToolbar(
+                folderURL: folderURL,
+                hasSelection: !selection.selection.isEmpty,
+                canExport: !itemsToExport.isEmpty,
+                document: documentForCurrentSelection,
+                showingGrid: $showingGrid,
+                onChooseFolder: { showingPicker = true },
+                onExport: { showingExport = true },
+                onSaveStyle: { showingSaveStyle = true },
+                onImportXMP: { showingImportXMP = true },
+                onImportLUT: { showingImportLUT = true },
+                onManageStyles: { showingManageStyles = true },
+                onApplyStyle: { style in
+                    documentForCurrentSelection?.recipe.apply(style: style)
+                }
+            )
+            Divider()
+            secondaryStatusBar
             Divider()
 
             if let errorMessage {
@@ -41,7 +64,8 @@ public struct BrowserView: View {
                         .frame(minWidth: 260, idealWidth: 360, maxWidth: 480)
                     EditorView(
                         item: selectedSingleItem,
-                        cachedDecode: cachedDecode
+                        cachedDecode: cachedDecode,
+                        showGrid: showingGrid
                     )
                     .frame(minWidth: 600)
                 }
@@ -72,6 +96,10 @@ public struct BrowserView: View {
             documentForCurrentSelection?.previewIsolation = nil
             return .handled
         }
+        .onKeyPress("g") {
+            showingGrid.toggle()
+            return .handled
+        }
         .onKeyPress(characters: CharacterSet(charactersIn: "012345"), phases: .down) { press in
             guard let digit = press.characters.first?.wholeNumberValue,
                   digit >= 0, digit <= 5,
@@ -99,21 +127,48 @@ public struct BrowserView: View {
         .sheet(isPresented: $showingExport) {
             ExportSheet(items: itemsToExport, isPresented: $showingExport)
         }
+        .sheet(isPresented: $showingSaveStyle) {
+            if let document = documentForCurrentSelection {
+                SaveStyleSheet(recipe: document.recipe, isPresented: $showingSaveStyle)
+            }
+        }
+        .sheet(isPresented: $showingManageStyles) {
+            ManageStylesSheet(isPresented: $showingManageStyles)
+        }
+        .fileImporter(
+            isPresented: $showingImportXMP,
+            allowedContentTypes: [.xml, UTType(filenameExtension: "xmp") ?? .xml],
+            allowsMultipleSelection: false
+        ) { result in handleImportXMP(result) }
+        .fileImporter(
+            isPresented: $showingImportLUT,
+            allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data],
+            allowsMultipleSelection: false
+        ) { result in handleImportLUT(result) }
+        .alert("Import failed", isPresented: Binding(
+            get: { importErrorMessage != nil },
+            set: { if !$0 { importErrorMessage = nil } }
+        )) {
+            Button("OK") { importErrorMessage = nil }
+        } message: {
+            Text(importErrorMessage ?? "")
+        }
     }
 
-    private var toolbar: some View {
-        HStack(spacing: 8) {
-            Button {
-                showingPicker = true
-            } label: {
-                Label("Choose Folder…", systemImage: "folder")
-            }
-
+    /// Slim status bar between toolbar and content showing folder path,
+    /// selection state, and grid hint. Replaces the old top toolbar's
+    /// inline status text.
+    private var secondaryStatusBar: some View {
+        HStack(spacing: 12) {
             if let folderURL {
                 Text(folderURL.path)
                     .font(.caption.monospaced())
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
+            } else {
+                Text("No folder loaded")
+                    .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
@@ -133,21 +188,9 @@ public struct BrowserView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
-            Button {
-                showingExport = true
-            } label: {
-                if !selection.batchSelection.isEmpty {
-                    Label("Export \(selection.batchSelection.count)…", systemImage: "square.and.arrow.up")
-                } else {
-                    Label("Export…", systemImage: "square.and.arrow.up")
-                }
-            }
-            .disabled(itemsToExport.isEmpty)
-            .keyboardShortcut("e", modifiers: [.command])
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 4)
     }
 
     /// Items destined for the export sheet. If the user has ticked any
@@ -256,6 +299,48 @@ public struct BrowserView: View {
                 // Best-effort — don't surface an alert for a rating click.
             }
         }.value
+    }
+
+    private func handleImportXMP(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            do {
+                let xml = try String(contentsOf: url, encoding: .utf8)
+                let baseName = url.deletingPathExtension().lastPathComponent
+                let style = try LightroomXMP.parse(xml, name: baseName)
+                UserStylesStore.shared.add(style)
+            } catch {
+                importErrorMessage = "Couldn't import XMP: \(error)"
+            }
+        case .failure(let error):
+            importErrorMessage = error.localizedDescription
+        }
+    }
+
+    private func handleImportLUT(_ result: Result<[URL], Error>) {
+        switch result {
+        case .success(let urls):
+            guard let url = urls.first else { return }
+            do {
+                let cubeText = try String(contentsOf: url, encoding: .utf8)
+                let baseName = url.deletingPathExtension().lastPathComponent
+                let lut = try CubeLUT.parse(cubeText, name: baseName)
+                let style = Style(
+                    name: baseName,
+                    category: "LUT",
+                    description: "Imported .cube LUT (\(lut.dimension)³)",
+                    operations: Operations(),
+                    exclusions: Set(OperationKind.allCases),
+                    lut: lut
+                )
+                UserStylesStore.shared.add(style)
+            } catch {
+                importErrorMessage = "Couldn't import LUT: \(error)"
+            }
+        case .failure(let error):
+            importErrorMessage = error.localizedDescription
+        }
     }
 
     private func loadFolder(_ folder: URL) {

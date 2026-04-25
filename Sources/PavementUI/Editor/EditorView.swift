@@ -4,14 +4,16 @@ import PavementCore
 public struct EditorView: View {
     let item: SourceItem?
     let cachedDecode: CachedDecode
+    let showGrid: Bool
 
     @State private var document: PavementDocument?
     @State private var loadingURL: URL?
     @State private var errorMessage: String?
 
-    public init(item: SourceItem?, cachedDecode: CachedDecode) {
+    public init(item: SourceItem?, cachedDecode: CachedDecode, showGrid: Bool = false) {
         self.item = item
         self.cachedDecode = cachedDecode
+        self.showGrid = showGrid
     }
 
     public var body: some View {
@@ -55,6 +57,7 @@ public struct EditorView: View {
                                     .padding(12)
                             }
                         }
+                        .overlay { if showGrid { GridOverlay() } }
                     DocumentStatusBar(document: document)
                 }
                 .frame(minWidth: 480)
