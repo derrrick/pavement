@@ -80,6 +80,23 @@ public final class PavementDocument {
         scheduleHistogram()
     }
 
+    /// Width-over-height of the source image (post-decode, no crop). Used by
+    /// the crop panel so aspect-ratio math accounts for the source's native
+    /// aspect — picking "1:1" needs to produce a square crop, not a square
+    /// rect of normalized coords.
+    public var sourceAspectRatio: CGFloat {
+        if let cached = cachedDecode.anyCached(for: source.url) {
+            let ext = cached.extent
+            if ext.width.isFinite, ext.height.isFinite, ext.width > 0, ext.height > 0 {
+                return ext.width / ext.height
+            }
+        }
+        if let w = exif?.pixelWidth, let h = exif?.pixelHeight, w > 0, h > 0 {
+            return CGFloat(w) / CGFloat(h)
+        }
+        return 1.5 // 3:2 fallback
+    }
+
     private func renderRecipe() -> CIImage? {
         let lensEnabled = recipe.operations.lensCorrection.enabled
         // Prefer the matching variant; fall back to the other one while a
