@@ -50,6 +50,8 @@ public struct EditorView: View {
                         HistogramView(histogram: document.histogram)
                             .frame(height: 80)
                         Divider()
+                        PresetsPanel(document: document)
+                        Divider()
                         BasicAdjustmentsPanelInline(document: document)
                         Divider()
                         ToneCurvePanel(document: document)
