@@ -14,7 +14,14 @@ let package = Package(
         .library(
             name: "PavementUI",
             targets: ["PavementUI"]
+        ),
+        .executable(
+            name: "pavement-cli",
+            targets: ["pavement-cli"]
         )
+    ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.4.0")
     ],
     targets: [
         .target(
@@ -28,6 +35,14 @@ let package = Package(
             name: "PavementUI",
             dependencies: ["PavementCore"],
             path: "Sources/PavementUI"
+        ),
+        .executableTarget(
+            name: "pavement-cli",
+            dependencies: [
+                "PavementCore",
+                .product(name: "ArgumentParser", package: "swift-argument-parser")
+            ],
+            path: "Sources/pavement-cli"
         ),
         .testTarget(
             name: "PavementCoreTests",
