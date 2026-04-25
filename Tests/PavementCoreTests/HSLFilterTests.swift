@@ -91,4 +91,47 @@ final class HSLFilterTests: XCTestCase {
         XCTAssertEqual(lut.dimension, 16)
         XCTAssertEqual(lut.data.count, 16 * 16 * 16 * 4 * MemoryLayout<Float>.size)
     }
+
+    /// Regression: with the previous HSV-based math, desaturating pure blue
+    /// (0, 0, 1) collapsed it to white (1, 1, 1) because V stayed at max.
+    /// True HSL gives mid-gray, which is what users expect.
+    func testDesaturatingPureBlueProducesGrayNotWhite() {
+        var op = HSLOp()
+        op.blue.s = -100
+        let input = solid(red: 0, green: 0, blue: 1)
+        let output = HSLFilter().apply(image: input, op: op)
+        let s = sample(output)
+        // Expect roughly mid-gray, not white. sRGB-encoded ~0.5 linear is
+        // around 0.74 byte-encoded, so accept anything mid-range.
+        XCTAssertLessThan(s[0], 0.95, "Should not be white")
+        XCTAssertEqual(s[0], s[1], accuracy: 0.05, "R/G should match (gray)")
+        XCTAssertEqual(s[1], s[2], accuracy: 0.05, "G/B should match (gray)")
+    }
+
+    func testRgbToHslMatchesKnownConversions() {
+        var hsl = HSLFilter.rgbToHsl(0, 0, 1)
+        XCTAssertEqual(hsl.0, 240, accuracy: 0.5)
+        XCTAssertEqual(hsl.1, 1, accuracy: 0.005)
+        XCTAssertEqual(hsl.2, 0.5, accuracy: 0.005)
+
+        hsl = HSLFilter.rgbToHsl(1, 1, 1)
+        XCTAssertEqual(hsl.1, 0, accuracy: 0.005)
+        XCTAssertEqual(hsl.2, 1, accuracy: 0.005)
+
+        hsl = HSLFilter.rgbToHsl(1, 0, 0)
+        XCTAssertEqual(hsl.0, 0, accuracy: 0.5)
+        XCTAssertEqual(hsl.2, 0.5, accuracy: 0.005)
+    }
+
+    func testHslToRgbRoundTripsKnownColors() {
+        let red = HSLFilter.hslToRgb(0, 1, 0.5)
+        XCTAssertEqual(red.0, 1, accuracy: 0.005)
+        XCTAssertEqual(red.1, 0, accuracy: 0.005)
+        XCTAssertEqual(red.2, 0, accuracy: 0.005)
+
+        let gray = HSLFilter.hslToRgb(0, 0, 0.5)
+        XCTAssertEqual(gray.0, 0.5, accuracy: 0.005)
+        XCTAssertEqual(gray.1, 0.5, accuracy: 0.005)
+        XCTAssertEqual(gray.2, 0.5, accuracy: 0.005)
+    }
 }

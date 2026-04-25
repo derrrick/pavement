@@ -1,12 +1,22 @@
 import Foundation
 import CoreImage
 
-/// Per-band hue/saturation/luminance via a 16³ 3D LUT consumed by CIColorCube.
+/// Per-band Hue/Saturation/Luminance via a 16³ 3D LUT consumed by CIColorCube.
 /// LUT generation runs on CPU per render (~120K float ops, sub-millisecond on
 /// M-series), keeping slider drags responsive.
+///
+/// Operates in true HSL (lightness = (max+min)/2), not HSV. HSV would
+/// desaturate pure blue (0,0,1) to white (1,1,1) because V stays at 1, which
+/// reads as "saturation inverted" since users expect mid-gray. HSL gives
+/// (0.5, 0.5, 0.5) for the same case — what Lightroom does.
 public struct HSLFilter {
     public static let lutDimension = 16
-    public static let bandFalloffDegrees: Float = 30
+
+    /// Each band influences pixels within ±60° of its hue center, with a
+    /// triangular falloff. 60° gives smooth coverage so every hue between
+    /// adjacent bands is influenced by both, eliminating dead zones at
+    /// 30° spacing.
+    public static let bandFalloffDegrees: Float = 60
 
     /// Canonical band hue centers (degrees, 0-360).
     public static let bandCenters: [Float] = [0, 30, 60, 120, 180, 240, 280, 320]
@@ -59,7 +69,7 @@ public struct HSLFilter {
     }
 
     private static func adjust(r: Float, g: Float, b: Float, bands: [HSLBand]) -> (Float, Float, Float) {
-        var (h, s, v) = rgbToHsv(r, g, b)
+        var (h, s, l) = rgbToHsl(r, g, b)
 
         // Gate by saturation: gray/near-gray pixels have undefined hue and
         // shouldn't be classified into any color band. Linear ramp from
@@ -72,8 +82,15 @@ public struct HSLFilter {
         var deltaH: Float = 0
         var deltaS: Float = 0
         var deltaL: Float = 0
-        var totalWeight: Float = 0
 
+        // Each band contributes its weighted adjustment additively. We do
+        // NOT normalize by total band weight here — that previously meant
+        // an adjacent band with zero adjustment but non-zero weight would
+        // dilute the active band's effect (e.g. desaturating pure blue
+        // only got s=0.25 because purple's weight inflated the divisor).
+        // Overlapping non-zero adjustments stack, which matches how
+        // multi-band tweaks are expected to compose; the final s/l clamp
+        // keeps the result in range.
         for (index, center) in bandCenters.enumerated() {
             let raw = abs(h - center)
             let dist = min(raw, 360 - raw)
@@ -83,14 +100,6 @@ public struct HSLFilter {
             deltaH += weight * Float(band.h) * 0.6
             deltaS += weight * Float(band.s) / 100
             deltaL += weight * Float(band.l) / 200
-            totalWeight += weight
-        }
-
-        if totalWeight > 0 {
-            let inv = 1.0 / totalWeight
-            deltaH *= inv
-            deltaS *= inv
-            deltaL *= inv
         }
 
         deltaH *= satGate
@@ -100,17 +109,24 @@ public struct HSLFilter {
         h = (h + deltaH).truncatingRemainder(dividingBy: 360)
         if h < 0 { h += 360 }
         s = max(0, min(1, s + deltaS * s))
-        v = max(0, min(1, v + deltaL))
+        l = max(0, min(1, l + deltaL))
 
-        return hsvToRgb(h, s, v)
+        return hslToRgb(h, s, l)
     }
 
-    private static func rgbToHsv(_ r: Float, _ g: Float, _ b: Float) -> (Float, Float, Float) {
+    // MARK: - HSL conversions
+
+    static func rgbToHsl(_ r: Float, _ g: Float, _ b: Float) -> (Float, Float, Float) {
         let cmax = max(r, max(g, b))
         let cmin = min(r, min(g, b))
         let d = cmax - cmin
+        let l = (cmax + cmin) * 0.5
         var h: Float = 0
+        var s: Float = 0
         if d > 0.000001 {
+            // Apple's classic formulation: s = d / (1 - |2L - 1|)
+            let denom = 1 - abs(2 * l - 1)
+            s = denom > 0.000001 ? d / denom : 0
             if cmax == r {
                 h = ((g - b) / d).truncatingRemainder(dividingBy: 6)
             } else if cmax == g {
@@ -121,14 +137,14 @@ public struct HSLFilter {
             h *= 60
             if h < 0 { h += 360 }
         }
-        let s: Float = cmax > 0.000001 ? d / cmax : 0
-        return (h, s, cmax)
+        return (h, s, l)
     }
 
-    private static func hsvToRgb(_ h: Float, _ s: Float, _ v: Float) -> (Float, Float, Float) {
-        let c = v * s
+    static func hslToRgb(_ h: Float, _ s: Float, _ l: Float) -> (Float, Float, Float) {
+        let c = (1 - abs(2 * l - 1)) * s
         let hp = h / 60
         let x = c * (1 - abs(hp.truncatingRemainder(dividingBy: 2) - 1))
+        let m = l - c * 0.5
         var r: Float = 0, g: Float = 0, b: Float = 0
         if hp >= 0 && hp < 1 { r = c; g = x }
         else if hp < 2 { r = x; g = c }
@@ -136,7 +152,6 @@ public struct HSLFilter {
         else if hp < 4 { g = x; b = c }
         else if hp < 5 { r = x; b = c }
         else { r = c; b = x }
-        let m = v - c
         return (r + m, g + m, b + m)
     }
 }
