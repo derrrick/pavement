@@ -12,12 +12,7 @@ struct ToneCurvePanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Tone Curve").font(.headline)
-                if !ToneCurveFilter.isIdentity(document.recipe.operations.toneCurve.rgb) {
-                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                        .help("Modified")
-                }
+            HStack {
                 Spacer()
                 Menu("Preset") {
                     Button("Identity") { setCurve([[0, 0], [1, 1]]) }
@@ -28,10 +23,7 @@ struct ToneCurvePanel: View {
                 }
                 .menuStyle(.borderlessButton)
                 .font(.caption)
-                Button("Reset") { setCurve([[0, 0], [1, 1]]) }
-                    .buttonStyle(.borderless)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                .frame(width: 80)
             }
 
             GeometryReader { geo in

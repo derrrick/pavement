@@ -1,43 +1,15 @@
 import SwiftUI
 import PavementCore
 
-struct BasicAdjustmentsPanel: View {
+/// Slider rows used by the editor's three "basic" sections.
+/// Each section ships as a separate view so it can live inside its own
+/// CollapsibleSection in the side panel.
+
+struct WhiteBalancePanel: View {
     @Bindable var document: PavementDocument
 
     var body: some View {
-        ScrollView {
-            BasicAdjustmentsPanelInline(document: document)
-                .padding(12)
-        }
-        .frame(minWidth: 240)
-    }
-}
-
-struct BasicAdjustmentsPanelInline: View {
-    @Bindable var document: PavementDocument
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            whiteBalanceSection
-            Divider()
-            exposureSection
-            Divider()
-            toneSection
-        }
-    }
-
-    // MARK: - White Balance
-
-    private var whiteBalanceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(
-                "White Balance",
-                modified: document.recipe.operations.whiteBalance != WhiteBalanceOp(),
-                reset: {
-                    document.recipe.operations.whiteBalance = WhiteBalanceOp()
-                }
-            )
-
             Picker("Mode", selection: Binding(
                 get: { document.recipe.operations.whiteBalance.mode },
                 set: { document.recipe.operations.whiteBalance.mode = $0 }
@@ -47,7 +19,7 @@ struct BasicAdjustmentsPanelInline: View {
             }
             .pickerStyle(.segmented)
 
-            slider(
+            SliderRow(
                 label: "Temp",
                 value: Binding(
                     get: { Double(document.recipe.operations.whiteBalance.temp) },
@@ -59,7 +31,7 @@ struct BasicAdjustmentsPanelInline: View {
                 defaultValue: 5500,
                 isEnabled: document.recipe.operations.whiteBalance.mode == WhiteBalanceOp.custom
             )
-            slider(
+            SliderRow(
                 label: "Tint",
                 value: Binding(
                     get: { Double(document.recipe.operations.whiteBalance.tint) },
@@ -73,99 +45,44 @@ struct BasicAdjustmentsPanelInline: View {
             )
         }
     }
+}
 
-    // MARK: - Exposure
+struct ExposurePanel: View {
+    @Bindable var document: PavementDocument
 
-    private var exposureSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(
-                "Exposure",
-                modified: document.recipe.operations.exposure.ev != 0,
-                reset: {
-                    document.recipe.operations.exposure = ExposureOp()
-                }
-            )
+    var body: some View {
+        SliderRow(
+            label: "EV",
+            value: $document.recipe.operations.exposure.ev,
+            range: Clamping.Range.exposureEV,
+            step: 0.05,
+            format: "%+.2f",
+            defaultValue: 0
+        )
+    }
+}
 
-            slider(
-                label: "EV",
-                value: $document.recipe.operations.exposure.ev,
-                range: Clamping.Range.exposureEV,
-                step: 0.05,
-                format: "%+.2f"
-            )
+struct TonePanel: View {
+    @Bindable var document: PavementDocument
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            intRow("Contrast",   keyPath: \.contrast)
+            intRow("Highlights", keyPath: \.highlights)
+            intRow("Shadows",    keyPath: \.shadows)
+            intRow("Whites",     keyPath: \.whites)
+            intRow("Blacks",     keyPath: \.blacks)
+            intRow("Recovery",   keyPath: \.highlightRecovery,
+                   range: Clamping.Range.highlightRecovery)
         }
     }
 
-    // MARK: - Tone
-
-    private var toneSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            sectionHeader(
-                "Tone",
-                modified: !ToneFilter.isIdentity(document.recipe.operations.tone),
-                reset: {
-                    document.recipe.operations.tone = ToneOp()
-                }
-            )
-
-            intSlider(label: "Contrast",   keyPath: \.contrast)
-            intSlider(label: "Highlights", keyPath: \.highlights)
-            intSlider(label: "Shadows",    keyPath: \.shadows)
-            intSlider(label: "Whites",     keyPath: \.whites)
-            intSlider(label: "Blacks",     keyPath: \.blacks)
-            intSlider(label: "Recovery",   keyPath: \.highlightRecovery,
-                      range: Clamping.Range.highlightRecovery)
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func sectionHeader(_ title: String, modified: Bool = false, reset: @escaping () -> Void) -> some View {
-        HStack(spacing: 6) {
-            Text(title).font(.headline)
-            if modified {
-                Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                    .help("Modified")
-            }
-            Spacer()
-            Button("Reset", action: reset)
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private func slider(
-        label: String,
-        value: Binding<Double>,
-        range: ClosedRange<Double>,
-        step: Double,
-        format: String,
-        defaultValue: Double = 0,
-        isEnabled: Bool = true
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack {
-                Text(label).font(.callout)
-                Spacer()
-                Text(String(format: format, value.wrappedValue))
-                    .font(.callout.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .onTapGesture(count: 2) { value.wrappedValue = defaultValue }
-                    .help("Double-click to reset")
-            }
-            Slider(value: value, in: range, step: step)
-                .disabled(!isEnabled)
-        }
-    }
-
-    private func intSlider(
-        label: String,
+    private func intRow(
+        _ label: String,
         keyPath: WritableKeyPath<ToneOp, Int>,
-        range: ClosedRange<Int> = Clamping.Range.signedHundred,
-        defaultValue: Int = 0
+        range: ClosedRange<Int> = Clamping.Range.signedHundred
     ) -> some View {
-        slider(
+        SliderRow(
             label: label,
             value: Binding(
                 get: { Double(document.recipe.operations.tone[keyPath: keyPath]) },
@@ -174,7 +91,35 @@ struct BasicAdjustmentsPanelInline: View {
             range: Double(range.lowerBound)...Double(range.upperBound),
             step: 1,
             format: "%+.0f",
-            defaultValue: Double(defaultValue)
+            defaultValue: 0
         )
+    }
+}
+
+/// Reusable slider row with label, slider, value readout, and a
+/// double-click-to-default behavior on the value text.
+struct SliderRow: View {
+    let label: String
+    @Binding var value: Double
+    let range: ClosedRange<Double>
+    let step: Double
+    let format: String
+    let defaultValue: Double
+    var isEnabled: Bool = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(label).font(.callout)
+                Spacer()
+                Text(String(format: format, value))
+                    .font(.callout.monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .onTapGesture(count: 2) { value = defaultValue }
+                    .help("Double-click to reset")
+            }
+            Slider(value: $value, in: range, step: step)
+                .disabled(!isEnabled)
+        }
     }
 }

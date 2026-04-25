@@ -10,21 +10,6 @@ struct ColorPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Color").font(.headline)
-                if isModified {
-                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                        .help("Modified — option-click 'Reset' to clear")
-                }
-                Spacer()
-                Button("Reset") {
-                    document.recipe.operations.color = ColorOp()
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
             HueSpectrumStrip(
                 hueRotationDegrees: document.recipe.operations.color.hue,
                 saturationBoost: document.recipe.operations.color.saturation,

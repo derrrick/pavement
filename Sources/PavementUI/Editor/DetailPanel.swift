@@ -11,20 +11,6 @@ struct DetailPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 6) {
-                Text("Detail").font(.headline)
-                if isModified {
-                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                }
-                Spacer()
-                Button("Reset") {
-                    document.recipe.operations.detail = DetailOp()
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            }
-
             VStack(alignment: .leading, spacing: 6) {
                 Text("Sharpening")
                     .font(.caption.weight(.semibold))

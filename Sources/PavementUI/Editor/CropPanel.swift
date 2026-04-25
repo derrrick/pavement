@@ -12,12 +12,7 @@ struct CropPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("Crop").font(.headline)
-                if isModified {
-                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                        .help("Modified")
-                }
+            HStack {
                 Spacer()
                 Toggle("On", isOn: Binding(
                     get: { document.recipe.operations.crop.enabled },
@@ -25,12 +20,6 @@ struct CropPanel: View {
                 ))
                 .toggleStyle(.switch)
                 .controlSize(.small)
-                Button("Reset") {
-                    document.recipe.operations.crop = CropOp()
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
 
             HStack {

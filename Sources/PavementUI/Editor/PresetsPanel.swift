@@ -16,14 +16,6 @@ struct PresetsPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Presets").font(.headline)
-                Spacer()
-                Text("\(BuiltinPresets.all.count)")
-                    .font(.caption2.monospacedDigit())
-                    .foregroundStyle(.tertiary)
-            }
-
             ForEach(grouped, id: \.category) { group in
                 VStack(alignment: .leading, spacing: 4) {
                     Text(group.category)

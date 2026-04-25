@@ -32,24 +32,13 @@ struct HSLPanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 6) {
-                Text("HSL").font(.headline)
-                if isModified {
-                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
-                        .help("Modified")
-                }
-                Spacer()
-                if document.previewIsolation != nil {
+            if document.previewIsolation != nil {
+                HStack {
+                    Spacer()
                     Button("Show All") { document.previewIsolation = nil }
                         .buttonStyle(.borderless)
                         .font(.caption)
                 }
-                Button("Reset") {
-                    document.recipe.operations.hsl = HSLOp()
-                }
-                .buttonStyle(.borderless)
-                .font(.caption)
-                .foregroundStyle(.secondary)
             }
 
             HueBandsVisualizer(

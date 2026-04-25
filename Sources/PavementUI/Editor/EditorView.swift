@@ -59,25 +59,11 @@ public struct EditorView: View {
                 }
                 .frame(minWidth: 480)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
                         HistogramView(histogram: document.histogram)
                             .frame(height: 80)
                         Divider()
-                        PresetsPanel(document: document)
-                        Divider()
-                        BasicAdjustmentsPanelInline(document: document)
-                        Divider()
-                        ToneCurvePanel(document: document)
-                        Divider()
-                        ColorPanel(document: document)
-                        Divider()
-                        HSLPanel(document: document)
-                        Divider()
-                        DetailPanel(document: document)
-                        Divider()
-                        CropPanel(document: document)
-                        Divider()
-                        LensPanel(document: document)
+                        sections(for: document)
                     }
                     .padding(12)
                 }
@@ -85,6 +71,86 @@ public struct EditorView: View {
             }
         } else {
             ProgressView("Loading…")
+        }
+    }
+
+    @ViewBuilder
+    private func sections(for document: PavementDocument) -> some View {
+        let ops = document.recipe.operations
+        CollapsibleSection(title: "Presets") {
+            PresetsPanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "White Balance",
+            isModified: ops.whiteBalance != WhiteBalanceOp(),
+            onReset: { document.recipe.operations.whiteBalance = WhiteBalanceOp() }
+        ) {
+            WhiteBalancePanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Exposure",
+            isModified: ops.exposure.ev != 0,
+            onReset: { document.recipe.operations.exposure = ExposureOp() }
+        ) {
+            ExposurePanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Tone",
+            isModified: !ToneFilter.isIdentity(ops.tone),
+            onReset: { document.recipe.operations.tone = ToneOp() }
+        ) {
+            TonePanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Tone Curve",
+            isModified: !ToneCurveFilter.isIdentity(ops.toneCurve.rgb),
+            onReset: { document.recipe.operations.toneCurve = ToneCurveOp() }
+        ) {
+            ToneCurvePanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Color",
+            isModified: !ColorAdjustFilter.isIdentity(ops.color),
+            onReset: { document.recipe.operations.color = ColorOp() }
+        ) {
+            ColorPanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "HSL",
+            isModified: !HSLFilter.isIdentity(ops.hsl),
+            onReset: { document.recipe.operations.hsl = HSLOp() }
+        ) {
+            HSLPanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Detail",
+            isModified: ops.detail != DetailOp(),
+            onReset: { document.recipe.operations.detail = DetailOp() }
+        ) {
+            DetailPanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Crop",
+            isModified: ops.crop != CropOp(),
+            defaultExpanded: false,
+            onReset: { document.recipe.operations.crop = CropOp() }
+        ) {
+            CropPanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
+            title: "Lens",
+            defaultExpanded: false
+        ) {
+            LensPanel(document: document)
         }
     }
 
