@@ -46,7 +46,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PavementCoreTests",
-            dependencies: ["PavementCore"],
+            dependencies: ["PavementCore", "PavementUI"],
             path: "Tests/PavementCoreTests",
             resources: [
                 .copy("Fixtures")

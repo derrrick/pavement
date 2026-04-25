@@ -1,9 +1,11 @@
 import Foundation
 
-public struct SourceItem: Equatable {
+public struct SourceItem: Hashable, Identifiable {
     public let url: URL
     public let type: RAWFileType
     public let fileSize: Int64
+
+    public var id: URL { url }
 
     public init(url: URL, type: RAWFileType, fileSize: Int64) {
         self.url = url
