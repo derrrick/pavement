@@ -1,11 +1,12 @@
 import Foundation
 
-public struct Operations: Codable, Equatable {
+public struct Operations: Equatable {
     public var crop: CropOp
     public var lensCorrection: LensCorrectionOp
     public var whiteBalance: WhiteBalanceOp
     public var exposure: ExposureOp
     public var tone: ToneOp
+    public var color: ColorOp
     public var toneCurve: ToneCurveOp
     public var hsl: HSLOp
     public var colorGrading: ColorGradingOp
@@ -20,6 +21,7 @@ public struct Operations: Codable, Equatable {
         whiteBalance: WhiteBalanceOp = .init(),
         exposure: ExposureOp = .init(),
         tone: ToneOp = .init(),
+        color: ColorOp = .init(),
         toneCurve: ToneCurveOp = .init(),
         hsl: HSLOp = .init(),
         colorGrading: ColorGradingOp = .init(),
@@ -33,6 +35,7 @@ public struct Operations: Codable, Equatable {
         self.whiteBalance = whiteBalance
         self.exposure = exposure
         self.tone = tone
+        self.color = color
         self.toneCurve = toneCurve
         self.hsl = hsl
         self.colorGrading = colorGrading
@@ -40,6 +43,51 @@ public struct Operations: Codable, Equatable {
         self.detail = detail
         self.grain = grain
         self.vignette = vignette
+    }
+}
+
+extension Operations: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case crop, lensCorrection, whiteBalance, exposure, tone, color
+        case toneCurve, hsl, colorGrading, bw, detail, grain, vignette
+    }
+
+    /// All fields decode-with-default so older sidecars (or sidecars from
+    /// other tools that omit operations entirely) still load. Newer fields
+    /// like `color` simply get their default value when absent.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.crop           = (try? c.decodeIfPresent(CropOp.self,           forKey: .crop))           ?? CropOp()
+        self.lensCorrection = (try? c.decodeIfPresent(LensCorrectionOp.self, forKey: .lensCorrection)) ?? LensCorrectionOp()
+        self.whiteBalance   = (try? c.decodeIfPresent(WhiteBalanceOp.self,   forKey: .whiteBalance))   ?? WhiteBalanceOp()
+        self.exposure       = (try? c.decodeIfPresent(ExposureOp.self,       forKey: .exposure))       ?? ExposureOp()
+        self.tone           = (try? c.decodeIfPresent(ToneOp.self,           forKey: .tone))           ?? ToneOp()
+        self.color          = (try? c.decodeIfPresent(ColorOp.self,          forKey: .color))          ?? ColorOp()
+        self.toneCurve      = (try? c.decodeIfPresent(ToneCurveOp.self,      forKey: .toneCurve))      ?? ToneCurveOp()
+        self.hsl            = (try? c.decodeIfPresent(HSLOp.self,            forKey: .hsl))            ?? HSLOp()
+        self.colorGrading   = (try? c.decodeIfPresent(ColorGradingOp.self,   forKey: .colorGrading))   ?? ColorGradingOp()
+        self.bw             = (try? c.decodeIfPresent(BWOp.self,             forKey: .bw))             ?? BWOp()
+        self.detail         = (try? c.decodeIfPresent(DetailOp.self,         forKey: .detail))         ?? DetailOp()
+        self.grain          = (try? c.decodeIfPresent(GrainOp.self,          forKey: .grain))          ?? GrainOp()
+        self.vignette       = (try? c.decodeIfPresent(VignetteOp.self,       forKey: .vignette))       ?? VignetteOp()
+    }
+}
+
+/// Global color adjustments applied uniformly across the image, regardless of
+/// hue band: hue rotation, saturation, vibrance (smart saturation), and
+/// luminance. Pairs with the per-band HSL controls above — global goes first
+/// in the pipeline, per-band tweaks the result.
+public struct ColorOp: Codable, Equatable {
+    public var hue: Int          // -180..180 degrees
+    public var saturation: Int   // -100..100, multiplicative
+    public var vibrance: Int     // -100..100, smart saturation
+    public var luminance: Int    // -100..100, additive offset
+
+    public init(hue: Int = 0, saturation: Int = 0, vibrance: Int = 0, luminance: Int = 0) {
+        self.hue = hue
+        self.saturation = saturation
+        self.vibrance = vibrance
+        self.luminance = luminance
     }
 }
 

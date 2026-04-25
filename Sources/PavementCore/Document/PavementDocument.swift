@@ -51,6 +51,28 @@ public final class PavementDocument {
     /// so slider drags don't rebuild the histogram every frame.
     public private(set) var histogram: Histogram = .empty
 
+    /// When set to a band index (0=red ... 7=magenta), the canvas
+    /// desaturates everything outside that hue range so the user sees
+    /// exactly which pixels an HSL adjustment will affect. View-only
+    /// state — never persisted to the sidecar.
+    public var previewIsolation: Int? {
+        didSet {
+            if previewIsolation != oldValue {
+                renderedImage = renderRecipe()
+            }
+        }
+    }
+
+    /// True when the user is holding the before/after key, so the canvas
+    /// shows the un-edited cached decode instead of the pipelined output.
+    public var showBefore: Bool = false {
+        didSet {
+            if showBefore != oldValue {
+                renderedImage = renderRecipe()
+            }
+        }
+    }
+
     private let cachedDecode: CachedDecode
     private let sidecar = SidecarStore()
     private let pipeline = PipelineGraph()
@@ -104,9 +126,16 @@ public final class PavementDocument {
         let cached = cachedDecode.cached(for: source.url, applyLensCorrection: lensEnabled)
             ?? cachedDecode.anyCached(for: source.url)
         guard let cached else { return nil }
+        if showBefore {
+            return cached
+        }
         var clamped = recipe
         Clamping.clampInPlace(&clamped)
-        return pipeline.apply(clamped, to: cached)
+        var img = pipeline.apply(clamped, to: cached)
+        if let bandIndex = previewIsolation {
+            img = IsolationFilter().apply(image: img, bandIndex: bandIndex)
+        }
+        return img
     }
 
     private func scheduleHistogram() {

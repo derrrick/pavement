@@ -25,7 +25,11 @@ public struct PipelineGraph {
 
         // §4 step 7: Tone curve.
         img = ToneCurveFilter().apply(image: img, op: recipe.operations.toneCurve)
-        // §4 step 8: HSL.
+        // Global color (hue, saturation, vibrance, luminance) sits between
+        // the curve and per-band HSL so band tweaks operate on the
+        // already-colour-graded image.
+        img = ColorAdjustFilter().apply(image: img, op: recipe.operations.color)
+        // §4 step 8: HSL (per-band).
         img = HSLFilter().apply(image: img, op: recipe.operations.hsl)
         // §4 step 9: Color grading — Phase 6.
         // §4 step 10: B&W — Phase 6.

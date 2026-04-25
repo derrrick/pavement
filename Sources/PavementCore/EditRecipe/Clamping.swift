@@ -30,11 +30,19 @@ public enum Clamping {
         clampWhiteBalance(&recipe.operations.whiteBalance)
         recipe.operations.exposure.ev = clamp(recipe.operations.exposure.ev, to: Range.exposureEV)
         clampTone(&recipe.operations.tone)
+        clampColor(&recipe.operations.color)
         clampHSL(&recipe.operations.hsl)
         clampGrading(&recipe.operations.colorGrading)
         clampDetail(&recipe.operations.detail)
         clampGrain(&recipe.operations.grain)
         clampVignette(&recipe.operations.vignette)
+    }
+
+    private static func clampColor(_ op: inout ColorOp) {
+        op.hue        = clamp(op.hue,        to: -180...180)
+        op.saturation = clamp(op.saturation, to: Range.signedHundred)
+        op.vibrance   = clamp(op.vibrance,   to: Range.signedHundred)
+        op.luminance  = clamp(op.luminance,  to: Range.signedHundred)
     }
 
     public static func clamped(_ recipe: EditRecipe) -> EditRecipe {
