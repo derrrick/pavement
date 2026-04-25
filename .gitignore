@@ -1,0 +1,37 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+
+# Xcode
+build/
+DerivedData/
+*.xcuserstate
+*.xcuserdatad/
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# SwiftPM
+.build/
+.swiftpm/
+Package.resolved
+
+# Editor
+.vscode/
+*.swp
+*~
+
+# Claude Code project-local settings (machine-specific)
+.claude/settings.local.json
+
+# Pavement runtime artifacts (live next to RAW folders, not in repo)
+_pavement/
+_exports/
+*.pavement.json
