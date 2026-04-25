@@ -64,6 +64,14 @@ public struct BrowserView: View {
             selection.move(.down)
             return .handled
         }
+        .onKeyPress("\\") {
+            documentForCurrentSelection?.showBefore.toggle()
+            return .handled
+        }
+        .onKeyPress(.escape) {
+            documentForCurrentSelection?.previewIsolation = nil
+            return .handled
+        }
         .fileImporter(
             isPresented: $showingPicker,
             allowedContentTypes: [.folder],
@@ -178,6 +186,15 @@ public struct BrowserView: View {
     private var selectedSingleItem: SourceItem? {
         guard let url = selection.primarySelectionURL else { return nil }
         return selection.items.first { $0.url == url }
+    }
+
+    /// Bridge for keyboard shortcuts that operate on the editor's loaded
+    /// document. EditorView owns the actual document; we expose a callback
+    /// hook through a binding so shortcuts at the BrowserView level can
+    /// reach in. For now we let the EditorView publish its document via
+    /// a shared environment value so this stays local.
+    private var documentForCurrentSelection: PavementDocument? {
+        EditorViewDocumentRegistry.shared.current
     }
 
     private func updateColumnCount(for width: CGFloat) {

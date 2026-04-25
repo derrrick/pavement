@@ -6,10 +6,18 @@ struct CropPanel: View {
 
     private static let aspectChoices: [String] = ["free", "1:1", "3:2", "4:5", "16:9"]
 
+    private var isModified: Bool {
+        document.recipe.operations.crop != CropOp()
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            HStack(spacing: 6) {
                 Text("Crop").font(.headline)
+                if isModified {
+                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                        .help("Modified")
+                }
                 Spacer()
                 Toggle("On", isOn: Binding(
                     get: { document.recipe.operations.crop.enabled },

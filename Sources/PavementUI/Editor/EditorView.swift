@@ -43,8 +43,21 @@ public struct EditorView: View {
             )
         } else if let document {
             HSplitView {
-                ImageCanvas(image: document.renderedImage)
-                    .frame(minWidth: 480)
+                VStack(spacing: 0) {
+                    ImageCanvas(image: document.renderedImage)
+                        .overlay(alignment: .topLeading) {
+                            if document.showBefore {
+                                Text("BEFORE")
+                                    .font(.caption.weight(.semibold))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
+                                    .background(.regularMaterial, in: Capsule())
+                                    .padding(12)
+                            }
+                        }
+                    DocumentStatusBar(document: document)
+                }
+                .frame(minWidth: 480)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         HistogramView(histogram: document.histogram)
@@ -78,12 +91,14 @@ public struct EditorView: View {
     private func loadIfNeeded() async {
         guard let item else {
             document = nil
+            EditorViewDocumentRegistry.shared.current = nil
             return
         }
         if document?.source.id == item.id { return }
 
         loadingURL = item.url
         document = nil
+        EditorViewDocumentRegistry.shared.current = nil
         errorMessage = nil
 
         do {
@@ -91,6 +106,7 @@ public struct EditorView: View {
             if loadingURL == item.url {
                 document = loaded
                 document?.refreshRender()
+                EditorViewDocumentRegistry.shared.current = loaded
             }
         } catch {
             if loadingURL == item.url {
@@ -98,4 +114,14 @@ public struct EditorView: View {
             }
         }
     }
+}
+
+/// Bridge so BrowserView's keyboard shortcuts (which can't easily reach
+/// EditorView's @State) can operate on the currently-loaded document.
+/// Single-document app, so a shared singleton is fine.
+@MainActor
+final class EditorViewDocumentRegistry {
+    static let shared = EditorViewDocumentRegistry()
+    var current: PavementDocument?
+    private init() {}
 }

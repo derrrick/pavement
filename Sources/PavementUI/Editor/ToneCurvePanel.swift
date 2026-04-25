@@ -12,8 +12,12 @@ struct ToneCurvePanel: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
+            HStack(spacing: 6) {
                 Text("Tone Curve").font(.headline)
+                if !ToneCurveFilter.isIdentity(document.recipe.operations.toneCurve.rgb) {
+                    Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                        .help("Modified")
+                }
                 Spacer()
                 Menu("Preset") {
                     Button("Identity") { setCurve([[0, 0], [1, 1]]) }

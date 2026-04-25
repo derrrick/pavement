@@ -30,9 +30,13 @@ struct BasicAdjustmentsPanelInline: View {
 
     private var whiteBalanceSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("White Balance", reset: {
-                document.recipe.operations.whiteBalance = WhiteBalanceOp()
-            })
+            sectionHeader(
+                "White Balance",
+                modified: document.recipe.operations.whiteBalance != WhiteBalanceOp(),
+                reset: {
+                    document.recipe.operations.whiteBalance = WhiteBalanceOp()
+                }
+            )
 
             Picker("Mode", selection: Binding(
                 get: { document.recipe.operations.whiteBalance.mode },
@@ -74,9 +78,13 @@ struct BasicAdjustmentsPanelInline: View {
 
     private var exposureSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Exposure", reset: {
-                document.recipe.operations.exposure = ExposureOp()
-            })
+            sectionHeader(
+                "Exposure",
+                modified: document.recipe.operations.exposure.ev != 0,
+                reset: {
+                    document.recipe.operations.exposure = ExposureOp()
+                }
+            )
 
             slider(
                 label: "EV",
@@ -92,9 +100,13 @@ struct BasicAdjustmentsPanelInline: View {
 
     private var toneSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            sectionHeader("Tone", reset: {
-                document.recipe.operations.tone = ToneOp()
-            })
+            sectionHeader(
+                "Tone",
+                modified: !ToneFilter.isIdentity(document.recipe.operations.tone),
+                reset: {
+                    document.recipe.operations.tone = ToneOp()
+                }
+            )
 
             intSlider(label: "Contrast",   keyPath: \.contrast)
             intSlider(label: "Highlights", keyPath: \.highlights)
@@ -108,9 +120,13 @@ struct BasicAdjustmentsPanelInline: View {
 
     // MARK: - Helpers
 
-    private func sectionHeader(_ title: String, reset: @escaping () -> Void) -> some View {
-        HStack {
+    private func sectionHeader(_ title: String, modified: Bool = false, reset: @escaping () -> Void) -> some View {
+        HStack(spacing: 6) {
             Text(title).font(.headline)
+            if modified {
+                Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                    .help("Modified")
+            }
             Spacer()
             Button("Reset", action: reset)
                 .buttonStyle(.borderless)
