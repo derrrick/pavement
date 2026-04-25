@@ -1,0 +1,112 @@
+{
+  "ai" : {
+    "lastInvokedAt" : "2026-04-25T12:01:00Z",
+    "lastModel" : "claude-sonnet-4-6",
+    "lastPrompt" : "chiaroscuro, deep shadows, warm midtones, slight grain",
+    "lastReferenceFingerprints" : [
+      "sha256:1111aaaa",
+      "sha256:2222bbbb"
+    ],
+    "rationale" : "Pulled shadows down for chiaroscuro, warmed midtones via color grading."
+  },
+  "createdAt" : "2026-04-25T12:00:00Z",
+  "modifiedAt" : "2026-04-25T12:01:30Z",
+  "operations" : {
+    "bw" : {
+      "enabled" : false,
+      "mix" : {
+        "aqua" : 0,
+        "blue" : 0,
+        "green" : 0,
+        "magenta" : 0,
+        "orange" : 0,
+        "purple" : 0,
+        "red" : 0,
+        "yellow" : 0
+      }
+    },
+    "colorGrading" : {
+      "balance" : 10,
+      "blending" : 50,
+      "global" : { "hue" : 0, "lum" : 0, "sat" : 0 },
+      "highlights" : { "hue" : 35, "lum" : 5, "sat" : 18 },
+      "midtones" : { "hue" : 25, "lum" : 0, "sat" : 8 },
+      "shadows" : { "hue" : 220, "lum" : -3, "sat" : 12 }
+    },
+    "crop" : {
+      "aspect" : "4:5",
+      "enabled" : true,
+      "h" : 0.9,
+      "rotation" : 1.5,
+      "w" : 0.72,
+      "x" : 0.05,
+      "y" : 0.05
+    },
+    "detail" : {
+      "noiseColor" : 25,
+      "noiseLuma" : 5,
+      "sharpAmount" : 40,
+      "sharpMasking" : 0,
+      "sharpRadius" : 1.0
+    },
+    "exposure" : {
+      "ev" : 0.3
+    },
+    "grain" : {
+      "amount" : 15,
+      "roughness" : 50,
+      "size" : 25
+    },
+    "hsl" : {
+      "aqua" : { "h" : 0, "l" : 0, "s" : 0 },
+      "blue" : { "h" : 0, "l" : 0, "s" : -20 },
+      "green" : { "h" : 0, "l" : 0, "s" : 0 },
+      "magenta" : { "h" : 0, "l" : 0, "s" : 0 },
+      "orange" : { "h" : 5, "l" : 0, "s" : 12 },
+      "purple" : { "h" : 0, "l" : 0, "s" : 0 },
+      "red" : { "h" : 0, "l" : 0, "s" : 0 },
+      "yellow" : { "h" : -3, "l" : 5, "s" : 0 }
+    },
+    "lensCorrection" : {
+      "auto" : true,
+      "ca" : 1.0,
+      "distortion" : 1.0,
+      "enabled" : true,
+      "vignette" : 1.0
+    },
+    "tone" : {
+      "blacks" : -10,
+      "contrast" : 30,
+      "highlights" : -25,
+      "highlightRecovery" : 50,
+      "shadows" : 35,
+      "whites" : 5
+    },
+    "toneCurve" : {
+      "b" : [ [0, 0], [1, 1] ],
+      "g" : [ [0, 0], [1, 1] ],
+      "r" : [ [0, 0], [1, 1] ],
+      "rgb" : [ [0, 0], [0.25, 0.18], [0.5, 0.5], [0.75, 0.82], [1, 1] ]
+    },
+    "vignette" : {
+      "amount" : -25,
+      "feather" : 50,
+      "midpoint" : 50,
+      "roundness" : 0
+    },
+    "whiteBalance" : {
+      "mode" : "custom",
+      "temp" : 5500,
+      "tint" : 0
+    }
+  },
+  "schemaVersion" : 1,
+  "source" : {
+    "camera" : "Fujifilm X-E4",
+    "captureTime" : "2026-04-15T18:42:11Z",
+    "fingerprint" : "sha256:abcd1234",
+    "iso" : 800,
+    "lens" : "XF 23mm F2 R WR",
+    "path" : "DSCF1234.RAF"
+  }
+}
