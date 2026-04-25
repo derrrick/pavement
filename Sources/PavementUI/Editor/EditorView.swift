@@ -44,7 +44,7 @@ public struct EditorView: View {
         } else if let document {
             HSplitView {
                 ImageCanvas(image: document.renderedImage)
-                    .frame(minWidth: 400)
+                    .frame(minWidth: 480)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
                         HistogramView(histogram: document.histogram)
@@ -62,7 +62,7 @@ public struct EditorView: View {
                     }
                     .padding(12)
                 }
-                .frame(minWidth: 280, maxWidth: 360)
+                .frame(minWidth: 320, idealWidth: 380, maxWidth: 480)
             }
         } else {
             ProgressView("Loading…")

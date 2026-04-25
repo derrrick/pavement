@@ -38,12 +38,12 @@ public struct BrowserView: View {
             } else {
                 HSplitView {
                     contactSheet
-                        .frame(minWidth: 260, idealWidth: 360)
+                        .frame(minWidth: 260, idealWidth: 360, maxWidth: 480)
                     EditorView(
                         item: selectedSingleItem,
                         cachedDecode: cachedDecode
                     )
-                    .frame(minWidth: 400)
+                    .frame(minWidth: 600)
                 }
             }
         }
