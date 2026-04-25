@@ -1,4 +1,5 @@
 import ArgumentParser
+import Foundation
 import PavementCore
 
 @main
@@ -14,13 +15,32 @@ struct PavementCLI: ParsableCommand {
 extension PavementCLI {
     struct Scan: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Scan a folder and list detected RAW files. (Phase 1)"
+            abstract: "Scan a folder and list detected RAW files."
         )
 
         @Argument(help: "Folder to scan.") var folder: String
 
         func run() throws {
-            throw ValidationError("scan: not yet implemented (Phase 1)")
+            let folderURL = URL(fileURLWithPath: (folder as NSString).expandingTildeInPath)
+            let scanner = FolderScanner()
+            let exif = ExifReader()
+            let items = try scanner.scan(folder: folderURL)
+
+            let dateFormatter = ISO8601DateFormatter()
+            dateFormatter.formatOptions = [.withInternetDateTime]
+            dateFormatter.timeZone = TimeZone(secondsFromGMT: 0)
+
+            var rawCount = 0
+            for item in items where item.type.isIngestible {
+                if item.type.isRaw { rawCount += 1 }
+                let exifData = exif.read(url: item.url)
+                let date = exifData?.captureTime.map { dateFormatter.string(from: $0) } ?? "—"
+                let camera = exifData?.camera ?? "—"
+                let typeLabel = item.type.rawValue.uppercased().padding(toLength: 4, withPad: " ", startingAt: 0)
+                print("\(typeLabel) \(date)  \(camera.padding(toLength: 20, withPad: " ", startingAt: 0))  \(item.url.path)")
+            }
+            print("---")
+            print("\(items.count) ingestible files (\(rawCount) RAW) under \(folderURL.path)")
         }
     }
 
