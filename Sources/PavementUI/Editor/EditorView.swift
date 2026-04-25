@@ -60,6 +60,8 @@ public struct EditorView: View {
                         Divider()
                         HSLPanel(document: document)
                         Divider()
+                        DetailPanel(document: document)
+                        Divider()
                         CropPanel(document: document)
                         Divider()
                         LensPanel(document: document)
