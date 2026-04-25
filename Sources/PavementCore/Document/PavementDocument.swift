@@ -15,9 +15,26 @@ public final class PavementDocument {
         didSet {
             guard recipe != oldValue else { return }
             recipe.modifiedAt = EditRecipe.now()
+            handleLensCorrectionToggleIfNeeded(oldValue: oldValue)
             renderedImage = renderRecipe()
             scheduleSave()
             scheduleHistogram()
+        }
+    }
+
+    private func handleLensCorrectionToggleIfNeeded(oldValue: EditRecipe) {
+        let oldEnabled = oldValue.operations.lensCorrection.enabled
+        let newEnabled = recipe.operations.lensCorrection.enabled
+        guard oldEnabled != newEnabled else { return }
+        cachedDecode.applyLensCorrection = newEnabled
+        let url = source.url
+        Task { [weak self] in
+            _ = try? await Task.detached(priority: .userInitiated) {
+                _ = try CachedDecode.realize(url: url, applyLensCorrection: newEnabled)
+            }.value
+            await MainActor.run {
+                self?.refreshRender()
+            }
         }
     }
 

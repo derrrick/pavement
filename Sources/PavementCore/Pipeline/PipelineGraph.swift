@@ -9,7 +9,10 @@ public struct PipelineGraph {
     public func apply(_ recipe: EditRecipe, to image: CIImage) -> CIImage {
         var img = image
 
-        // §4 step 2: Lens correction — Phase 3.
+        // §4 step 2: Lens correction. The auto/EXIF path runs inside the
+        // RAW decoder via CachedDecode; this stage is a placeholder for
+        // future custom strengths and Lensfun.
+        img = LensCorrectionFilter().apply(image: img, op: recipe.operations.lensCorrection)
         // §4 step 3: White balance.
         img = WhiteBalanceFilter().apply(image: img, op: recipe.operations.whiteBalance)
 

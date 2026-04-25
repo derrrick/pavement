@@ -57,6 +57,8 @@ public struct EditorView: View {
                         HSLPanel(document: document)
                         Divider()
                         CropPanel(document: document)
+                        Divider()
+                        LensPanel(document: document)
                     }
                     .padding(12)
                 }

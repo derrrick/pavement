@@ -19,7 +19,12 @@ public struct DecodeStage {
     /// Decodes a source file to a linear scene-referred CIImage in the
     /// engine's working color space. RAW files use CIRAWFilter; JPEGs use
     /// CIImage(contentsOf:). Unsupported types throw `.unsupported`.
-    public func decode(url: URL) throws -> CIImage {
+    ///
+    /// When `applyLensCorrection` is true, CIRAWFilter applies the
+    /// camera's embedded lens profile (vignette + distortion + CA);
+    /// otherwise the toggle leaves the source raw. Has no effect on
+    /// JPEG sources — they're already developed by the camera.
+    public func decode(url: URL, applyLensCorrection: Bool = true) throws -> CIImage {
         let type = RAWFileType.from(url: url)
 
         if type.isRaw {
@@ -29,6 +34,7 @@ public struct DecodeStage {
             // Skip Apple's gamut map so Fujifilm RAFs (and other wide-gamut
             // sources) don't double-cook a film simulation; PLAN.md §7.
             filter.isGamutMappingEnabled = false
+            filter.isLensCorrectionEnabled = applyLensCorrection
             guard let image = filter.outputImage else {
                 throw DecodeError.outputUnavailable(url: url)
             }

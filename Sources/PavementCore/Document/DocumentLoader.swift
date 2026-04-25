@@ -36,6 +36,7 @@ public struct DocumentLoader {
         if recipe.source.fingerprint.isEmpty {
             recipe.source.fingerprint = fingerprint
         }
+        cachedDecode.applyLensCorrection = recipe.operations.lensCorrection.enabled
         if let exif {
             if recipe.source.camera == nil { recipe.source.camera = exif.camera }
             if recipe.source.lens == nil { recipe.source.lens = exif.lens }
