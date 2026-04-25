@@ -8,6 +8,7 @@ public struct BrowserView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var showingPicker = false
+    @State private var showingExport = false
     @State private var cachedDecode = CachedDecode()
 
     private let columnsLayout: [GridItem] = [
@@ -77,6 +78,9 @@ public struct BrowserView: View {
                 errorMessage = error.localizedDescription
             }
         }
+        .sheet(isPresented: $showingExport) {
+            ExportSheet(items: itemsToExport, isPresented: $showingExport)
+        }
     }
 
     private var toolbar: some View {
@@ -102,9 +106,23 @@ public struct BrowserView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Button {
+                showingExport = true
+            } label: {
+                Label("Export…", systemImage: "square.and.arrow.up")
+            }
+            .disabled(selection.selection.isEmpty)
+            .keyboardShortcut("e", modifiers: [.command])
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+    }
+
+    private var itemsToExport: [SourceItem] {
+        guard !selection.selection.isEmpty else { return [] }
+        let urls = selection.selection
+        return selection.items.filter { urls.contains($0.url) }
     }
 
     private var emptyState: some View {
