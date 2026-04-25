@@ -8,7 +8,7 @@ struct PavementCLI: ParsableCommand {
         commandName: "pavement-cli",
         abstract: "Smoke-test harness for the Pavement engine.",
         version: PavementCore.version,
-        subcommands: [Scan.self, Decode.self, Render.self, Export.self]
+        subcommands: [Scan.self, Decode.self, Thumbnails.self, Render.self, Export.self]
     )
 }
 
@@ -66,6 +66,45 @@ extension PavementCLI {
             let w = Int(image.extent.width.rounded())
             let h = Int(image.extent.height.rounded())
             print("Wrote \(dst.path) (\(w)x\(h))")
+        }
+    }
+
+    struct Thumbnails: ParsableCommand {
+        static let configuration = CommandConfiguration(
+            abstract: "Populate the per-folder thumbnail cache for every ingestible source."
+        )
+
+        @Argument(help: "Folder to walk.") var folder: String
+        @Flag(name: .long, help: "Regenerate even if a thumbnail already exists.") var force = false
+
+        func run() throws {
+            let folderURL = URL(fileURLWithPath: (folder as NSString).expandingTildeInPath)
+            let scanner = FolderScanner()
+            let cache = ThumbnailCache()
+            let items = try scanner.scan(folder: folderURL)
+
+            var generated = 0
+            var skipped = 0
+            var failed = 0
+            for item in items {
+                let dest = ThumbnailCache.thumbnailURL(for: item.url)
+                if !force, cache.cached(for: item.url) != nil {
+                    skipped += 1
+                    continue
+                }
+                do {
+                    _ = try cache.generate(for: item.url)
+                    generated += 1
+                    print("✓ \(item.url.lastPathComponent) -> \(dest.lastPathComponent)")
+                } catch {
+                    failed += 1
+                    FileHandle.standardError.write(
+                        Data("✗ \(item.url.lastPathComponent): \(error)\n".utf8)
+                    )
+                }
+            }
+            print("---")
+            print("\(generated) generated, \(skipped) cached, \(failed) failed (\(items.count) total)")
         }
     }
 
