@@ -7,12 +7,9 @@ public struct BrowserView: View {
     @State private var selection = SelectionModel()
     @State private var isLoading = false
     @State private var errorMessage: String?
-    @State private var showingPicker = false
     @State private var showingExport = false
     @State private var showingSaveStyle = false
     @State private var showingManageStyles = false
-    @State private var showingImportXMP = false
-    @State private var showingImportLUT = false
     @State private var importErrorMessage: String?
     @State private var showingGrid = false
     @State private var cachedDecode = CachedDecode()
@@ -31,11 +28,11 @@ public struct BrowserView: View {
                 canExport: !itemsToExport.isEmpty,
                 document: documentForCurrentSelection,
                 showingGrid: $showingGrid,
-                onChooseFolder: { showingPicker = true },
+                onChooseFolder: { chooseFolder() },
                 onExport: { showingExport = true },
                 onSaveStyle: { showingSaveStyle = true },
-                onImportXMP: { showingImportXMP = true },
-                onImportLUT: { showingImportLUT = true },
+                onImportXMP: { chooseXMP() },
+                onImportLUT: { chooseLUT() },
                 onManageStyles: { showingManageStyles = true },
                 onApplyStyle: { style in
                     documentForCurrentSelection?.recipe.apply(style: style)
@@ -72,6 +69,7 @@ public struct BrowserView: View {
             }
         }
         .focusable()
+        .focusEffectDisabled()
         .onKeyPress(.leftArrow) {
             selection.move(.left)
             return .handled
@@ -110,20 +108,6 @@ public struct BrowserView: View {
             Task { await persistRating(digit, for: url) }
             return .handled
         }
-        .fileImporter(
-            isPresented: $showingPicker,
-            allowedContentTypes: [.folder],
-            allowsMultipleSelection: false
-        ) { result in
-            switch result {
-            case .success(let urls):
-                if let folder = urls.first {
-                    loadFolder(folder)
-                }
-            case .failure(let error):
-                errorMessage = error.localizedDescription
-            }
-        }
         .sheet(isPresented: $showingExport) {
             ExportSheet(items: itemsToExport, isPresented: $showingExport)
         }
@@ -135,16 +119,6 @@ public struct BrowserView: View {
         .sheet(isPresented: $showingManageStyles) {
             ManageStylesSheet(isPresented: $showingManageStyles)
         }
-        .fileImporter(
-            isPresented: $showingImportXMP,
-            allowedContentTypes: [.xml, UTType(filenameExtension: "xmp") ?? .xml],
-            allowsMultipleSelection: false
-        ) { result in handleImportXMP(result) }
-        .fileImporter(
-            isPresented: $showingImportLUT,
-            allowedContentTypes: [UTType(filenameExtension: "cube") ?? .data],
-            allowsMultipleSelection: false
-        ) { result in handleImportLUT(result) }
         .alert("Import failed", isPresented: Binding(
             get: { importErrorMessage != nil },
             set: { if !$0 { importErrorMessage = nil } }
@@ -223,7 +197,7 @@ public struct BrowserView: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
-            Button("Try Again") { showingPicker = true }
+            Button("Try Again") { chooseFolder() }
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -301,45 +275,63 @@ public struct BrowserView: View {
         }.value
     }
 
-    private func handleImportXMP(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            do {
-                let xml = try String(contentsOf: url, encoding: .utf8)
-                let baseName = url.deletingPathExtension().lastPathComponent
-                let style = try LightroomXMP.parse(xml, name: baseName)
-                UserStylesStore.shared.add(style)
-            } catch {
-                importErrorMessage = "Couldn't import XMP: \(error)"
-            }
-        case .failure(let error):
-            importErrorMessage = error.localizedDescription
+    /// Open a native NSOpenPanel for a folder. We bypass SwiftUI's
+    /// .fileImporter because stacking three of them on the same view
+    /// caused the buttons to silently no-op (only one fires reliably).
+    private func chooseFolder() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.prompt = "Choose Folder"
+        panel.message = "Choose a folder containing RAFs, CR3s, DNGs, or JPEGs."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        loadFolder(url)
+    }
+
+    private func chooseXMP() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.xml, UTType(filenameExtension: "xmp") ?? .xml]
+        panel.prompt = "Import"
+        panel.message = "Pick a Lightroom XMP preset to import as a Style."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let xml = try String(contentsOf: url, encoding: .utf8)
+            let baseName = url.deletingPathExtension().lastPathComponent
+            let style = try LightroomXMP.parse(xml, name: baseName)
+            UserStylesStore.shared.add(style)
+        } catch {
+            importErrorMessage = "Couldn't import XMP: \(error)"
         }
     }
 
-    private func handleImportLUT(_ result: Result<[URL], Error>) {
-        switch result {
-        case .success(let urls):
-            guard let url = urls.first else { return }
-            do {
-                let cubeText = try String(contentsOf: url, encoding: .utf8)
-                let baseName = url.deletingPathExtension().lastPathComponent
-                let lut = try CubeLUT.parse(cubeText, name: baseName)
-                let style = Style(
-                    name: baseName,
-                    category: "LUT",
-                    description: "Imported .cube LUT (\(lut.dimension)³)",
-                    operations: Operations(),
-                    exclusions: Set(OperationKind.allCases),
-                    lut: lut
-                )
-                UserStylesStore.shared.add(style)
-            } catch {
-                importErrorMessage = "Couldn't import LUT: \(error)"
-            }
-        case .failure(let error):
-            importErrorMessage = error.localizedDescription
+    private func chooseLUT() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [UTType(filenameExtension: "cube") ?? .data]
+        panel.prompt = "Import"
+        panel.message = "Pick a .cube 3D LUT to import as a Style."
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        do {
+            let cubeText = try String(contentsOf: url, encoding: .utf8)
+            let baseName = url.deletingPathExtension().lastPathComponent
+            let lut = try CubeLUT.parse(cubeText, name: baseName)
+            let style = Style(
+                name: baseName,
+                category: "LUT",
+                description: "Imported .cube LUT (\(lut.dimension)³)",
+                operations: Operations(),
+                exclusions: Set(OperationKind.allCases),
+                lut: lut
+            )
+            UserStylesStore.shared.add(style)
+        } catch {
+            importErrorMessage = "Couldn't import LUT: \(error)"
         }
     }
 
