@@ -36,7 +36,8 @@ public struct PipelineGraph {
         // §4 step 10: B&W — Phase 6.
         // §4 step 11: Detail (sharpening + noise reduction).
         img = DetailFilter().apply(image: img, op: recipe.operations.detail)
-        // §4 step 12: Effects — Phase 6.
+        // §4 step 12: Effects — grain.
+        img = GrainFilter().apply(image: img, op: recipe.operations.grain)
         // §4 step 13: Crop / rotate.
         img = CropFilter().apply(image: img, op: recipe.operations.crop)
 

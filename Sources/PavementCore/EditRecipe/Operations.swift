@@ -357,15 +357,42 @@ public struct DetailOp: Codable, Equatable {
     }
 }
 
-public struct GrainOp: Codable, Equatable {
+public struct GrainOp: Equatable {
+    public static let typeCubic     = "cubic"
+    public static let typeTabular   = "tabular"
+    public static let typeNewsprint = "newsprint"
+    public static let typeSilverRich = "silverRich"
+    public static let typeSoft      = "soft"
+    public static let typePlate     = "plate"
+
+    public static let allTypes: [String] = [
+        typeCubic, typeTabular, typeNewsprint, typeSilverRich, typeSoft, typePlate
+    ]
+
     public var amount: Int
     public var size: Int
     public var roughness: Int
+    public var type: String
 
-    public init(amount: Int = 0, size: Int = 25, roughness: Int = 50) {
+    public init(amount: Int = 0, size: Int = 25, roughness: Int = 50, type: String = GrainOp.typeCubic) {
         self.amount = amount
         self.size = size
         self.roughness = roughness
+        self.type = type
+    }
+}
+
+extension GrainOp: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case amount, size, roughness, type
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.amount    = (try? c.decodeIfPresent(Int.self, forKey: .amount))    ?? 0
+        self.size      = (try? c.decodeIfPresent(Int.self, forKey: .size))      ?? 25
+        self.roughness = (try? c.decodeIfPresent(Int.self, forKey: .roughness)) ?? 50
+        self.type      = (try? c.decodeIfPresent(String.self, forKey: .type))   ?? GrainOp.typeCubic
     }
 }
 

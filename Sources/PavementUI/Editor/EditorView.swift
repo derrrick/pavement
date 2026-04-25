@@ -146,6 +146,15 @@ public struct EditorView: View {
         }
         Divider()
         CollapsibleSection(
+            title: "Grain",
+            isModified: !GrainFilter.isIdentity(ops.grain),
+            defaultExpanded: false,
+            onReset: { document.recipe.operations.grain = GrainOp() }
+        ) {
+            GrainPanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
             title: "Crop",
             isModified: ops.crop != CropOp(),
             defaultExpanded: false,
