@@ -17,16 +17,22 @@ public final class PavementDocument {
             recipe.modifiedAt = EditRecipe.now()
             renderedImage = renderRecipe()
             scheduleSave()
+            scheduleHistogram()
         }
     }
 
     /// Latest rendered preview (post-pipeline). Observers redraw when this changes.
     public private(set) var renderedImage: CIImage?
 
+    /// Latest histogram of the rendered preview. Updated on a 100ms debounce
+    /// so slider drags don't rebuild the histogram every frame.
+    public private(set) var histogram: Histogram = .empty
+
     private let cachedDecode: CachedDecode
     private let sidecar = SidecarStore()
     private let pipeline = PipelineGraph()
     private var saveTask: Task<Void, Never>?
+    private var histogramTask: Task<Void, Never>?
 
     public init(
         source: SourceItem,
@@ -48,6 +54,7 @@ public final class PavementDocument {
     /// can call this once decode completes.
     public func refreshRender() {
         renderedImage = renderRecipe()
+        scheduleHistogram()
     }
 
     private func renderRecipe() -> CIImage? {
@@ -55,6 +62,28 @@ public final class PavementDocument {
         var clamped = recipe
         Clamping.clampInPlace(&clamped)
         return pipeline.apply(clamped, to: cached)
+    }
+
+    private func scheduleHistogram() {
+        histogramTask?.cancel()
+        guard let image = renderedImage else { return }
+        histogramTask = Task { [weak self] in
+            do {
+                try await Task.sleep(nanoseconds: 100_000_000)
+                guard !Task.isCancelled else { return }
+                let computed = await Task.detached(priority: .userInitiated) {
+                    HistogramComputer().compute(image: image)
+                }.value
+                guard !Task.isCancelled else { return }
+                await MainActor.run {
+                    self?.histogram = computed
+                }
+            } catch is CancellationError {
+                return
+            } catch {
+                Log.pipeline.error("Histogram failed: \(String(describing: error), privacy: .public)")
+            }
+        }
     }
 
     private func scheduleSave() {

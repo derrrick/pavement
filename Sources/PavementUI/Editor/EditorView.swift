@@ -47,6 +47,9 @@ public struct EditorView: View {
                     .frame(minWidth: 400)
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
+                        HistogramView(histogram: document.histogram)
+                            .frame(height: 80)
+                        Divider()
                         BasicAdjustmentsPanelInline(document: document)
                         Divider()
                         ToneCurvePanel(document: document)
