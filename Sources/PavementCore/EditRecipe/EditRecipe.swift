@@ -10,6 +10,10 @@ public struct EditRecipe: Equatable {
     public var operations: Operations
     public var ai: AIMetadata
 
+    /// User-set star rating, 0..5. 0 = unrated. Persists in the sidecar so
+    /// favorites survive across sessions.
+    public var rating: Int
+
     /// Unknown top-level keys preserved on round-trip so a sidecar written by a
     /// future Pavement build (with new top-level fields) does not lose data
     /// when an older build loads, edits a known field, and re-saves it.
@@ -22,6 +26,7 @@ public struct EditRecipe: Equatable {
         modifiedAt: Date = EditRecipe.now(),
         operations: Operations = .init(),
         ai: AIMetadata = .init(),
+        rating: Int = 0,
         unknownKeys: [String: JSONValue] = [:]
     ) {
         self.schemaVersion = schemaVersion
@@ -30,6 +35,7 @@ public struct EditRecipe: Equatable {
         self.modifiedAt = modifiedAt
         self.operations = operations
         self.ai = ai
+        self.rating = rating
         self.unknownKeys = unknownKeys
     }
 
@@ -57,7 +63,7 @@ public struct EditRecipe: Equatable {
 
 extension EditRecipe: Codable {
     private static let knownKeys: Set<String> = [
-        "schemaVersion", "source", "createdAt", "modifiedAt", "operations", "ai"
+        "schemaVersion", "source", "createdAt", "modifiedAt", "operations", "ai", "rating"
     ]
 
     public init(from decoder: Decoder) throws {
@@ -69,6 +75,7 @@ extension EditRecipe: Codable {
         self.modifiedAt    = try container.decode(Date.self, forKey: AnyCodingKey("modifiedAt"))
         self.operations    = try container.decode(Operations.self, forKey: AnyCodingKey("operations"))
         self.ai            = try container.decode(AIMetadata.self, forKey: AnyCodingKey("ai"))
+        self.rating        = (try? container.decodeIfPresent(Int.self, forKey: AnyCodingKey("rating"))) ?? 0
 
         var captured: [String: JSONValue] = [:]
         for key in container.allKeys where !Self.knownKeys.contains(key.stringValue) {
@@ -85,6 +92,7 @@ extension EditRecipe: Codable {
         try container.encode(modifiedAt,    forKey: AnyCodingKey("modifiedAt"))
         try container.encode(operations,    forKey: AnyCodingKey("operations"))
         try container.encode(ai,            forKey: AnyCodingKey("ai"))
+        try container.encode(rating,        forKey: AnyCodingKey("rating"))
 
         for (rawKey, value) in unknownKeys {
             try container.encode(value, forKey: AnyCodingKey(rawKey))

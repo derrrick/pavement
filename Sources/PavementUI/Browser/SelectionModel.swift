@@ -16,6 +16,16 @@ public final class SelectionModel {
     public private(set) var selection: Set<URL> = []
     public private(set) var anchorIndex: Int?
 
+    /// Independent of `selection` — items the user has flagged for batch
+    /// operations (export, AI run, etc.) by ticking the thumbnail checkbox.
+    /// Survives selection changes; cleared on folder reload.
+    public var batchSelection: Set<URL> = []
+
+    /// Per-source ratings (0..5). Backed by sidecar files when an item is
+    /// loaded; cached here so the contact sheet can render stars without
+    /// blocking on disk per cell. Updated when the user clicks a star.
+    public var ratings: [URL: Int] = [:]
+
     /// Number of columns in the current grid layout. BrowserView keeps this
     /// in sync as the window resizes; SelectionModel uses it to translate
     /// up/down arrow keys into linear offsets.
@@ -25,6 +35,7 @@ public final class SelectionModel {
 
     public func setItems(_ newItems: [SourceItem]) {
         items = newItems
+        batchSelection = []
         if let firstURL = newItems.first?.url {
             selection = [firstURL]
             anchorIndex = 0
@@ -32,6 +43,40 @@ public final class SelectionModel {
             selection = []
             anchorIndex = nil
         }
+    }
+
+    public func toggleBatchSelection(for url: URL) {
+        if batchSelection.contains(url) {
+            batchSelection.remove(url)
+        } else {
+            batchSelection.insert(url)
+        }
+    }
+
+    public func clearBatchSelection() {
+        batchSelection.removeAll()
+    }
+
+    public func selectAllForBatch() {
+        batchSelection = Set(items.map(\.url))
+    }
+
+    public func setRating(_ rating: Int, for url: URL) {
+        let clamped = max(0, min(5, rating))
+        if clamped == 0 {
+            ratings.removeValue(forKey: url)
+        } else {
+            ratings[url] = clamped
+        }
+    }
+
+    public func setRatingForCurrent(_ rating: Int) {
+        guard let url = primarySelectionURL else { return }
+        setRating(rating, for: url)
+    }
+
+    public func rating(for url: URL) -> Int {
+        ratings[url] ?? 0
     }
 
     public var primarySelectionURL: URL? {

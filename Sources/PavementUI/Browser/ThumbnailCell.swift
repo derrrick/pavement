@@ -5,13 +5,17 @@ import PavementCore
 struct ThumbnailCell: View {
     let item: SourceItem
     let isSelected: Bool
+    let isBatchChecked: Bool
+    let rating: Int
     let onClick: (_ shift: Bool, _ command: Bool) -> Void
+    let onToggleBatch: () -> Void
+    let onRate: (Int) -> Void
 
     @State private var image: NSImage?
 
     var body: some View {
         VStack(spacing: 4) {
-            ZStack {
+            ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
                     .fill(Color(white: 0.12))
                 if let image {
@@ -24,6 +28,19 @@ struct ThumbnailCell: View {
                     ProgressView()
                         .controlSize(.small)
                 }
+
+                Button {
+                    onToggleBatch()
+                } label: {
+                    Image(systemName: isBatchChecked ? "checkmark.square.fill" : "square")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(isBatchChecked ? Color.accentColor : Color.white.opacity(0.85))
+                        .shadow(color: .black.opacity(0.4), radius: 2)
+                        .padding(6)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(isBatchChecked ? "Remove from batch" : "Add to batch")
             }
             .aspectRatio(1, contentMode: .fit)
             .overlay(
@@ -42,6 +59,9 @@ struct ThumbnailCell: View {
                     .foregroundStyle(.tertiary)
             }
             .padding(.horizontal, 2)
+
+            StarRating(value: rating, onSet: onRate)
+                .padding(.horizontal, 2)
         }
         .contentShape(Rectangle())
         .onTapGesture {
