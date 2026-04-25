@@ -130,6 +130,14 @@ public struct EditorView: View {
         }
         Divider()
         CollapsibleSection(
+            title: "Color Balance",
+            isModified: ops.colorGrading != ColorGradingOp(),
+            onReset: { document.recipe.operations.colorGrading = ColorGradingOp() }
+        ) {
+            ColorBalancePanel(document: document)
+        }
+        Divider()
+        CollapsibleSection(
             title: "Detail",
             isModified: ops.detail != DetailOp(),
             onReset: { document.recipe.operations.detail = DetailOp() }

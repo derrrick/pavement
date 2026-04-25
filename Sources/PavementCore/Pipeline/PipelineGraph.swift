@@ -31,7 +31,8 @@ public struct PipelineGraph {
         img = ColorAdjustFilter().apply(image: img, op: recipe.operations.color)
         // §4 step 8: HSL (per-band).
         img = HSLFilter().apply(image: img, op: recipe.operations.hsl)
-        // §4 step 9: Color grading — Phase 6.
+        // §4 step 9: Color grading.
+        img = ColorGradingFilter().apply(image: img, op: recipe.operations.colorGrading)
         // §4 step 10: B&W — Phase 6.
         // §4 step 11: Detail (sharpening + noise reduction).
         img = DetailFilter().apply(image: img, op: recipe.operations.detail)
