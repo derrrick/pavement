@@ -34,7 +34,12 @@ public struct BrowserView: View {
                     description: Text("Folder contained no RAF, CR3, DNG, or JPEG files.")
                 )
             } else {
-                contactSheet
+                HSplitView {
+                    contactSheet
+                        .frame(minWidth: 260, idealWidth: 360)
+                    PreviewPane(sourceURL: selection.primarySelectionURL)
+                        .frame(minWidth: 400)
+                }
             }
         }
         .focusable()
