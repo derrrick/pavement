@@ -21,7 +21,8 @@ public struct PipelineGraph {
         img = ToneFilter().apply(image: img, op: recipe.operations.tone)
 
         // §4 step 7: Tone curve — Phase 2.18.
-        // §4 step 8: HSL — Phase 2.17.
+        // §4 step 8: HSL.
+        img = HSLFilter().apply(image: img, op: recipe.operations.hsl)
         // §4 step 9: Color grading — Phase 6.
         // §4 step 10: B&W — Phase 6.
         // §4 step 11: Detail — Phase 6.

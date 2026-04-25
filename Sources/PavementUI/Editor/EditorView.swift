@@ -45,8 +45,15 @@ public struct EditorView: View {
             HSplitView {
                 ImageCanvas(image: document.renderedImage)
                     .frame(minWidth: 400)
-                BasicAdjustmentsPanel(document: document)
-                    .frame(minWidth: 240, maxWidth: 320)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        BasicAdjustmentsPanelInline(document: document)
+                        Divider()
+                        HSLPanel(document: document)
+                    }
+                    .padding(12)
+                }
+                .frame(minWidth: 260, maxWidth: 340)
             }
         } else {
             ProgressView("Loading…")

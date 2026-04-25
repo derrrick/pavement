@@ -6,16 +6,24 @@ struct BasicAdjustmentsPanel: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                whiteBalanceSection
-                Divider()
-                exposureSection
-                Divider()
-                toneSection
-            }
-            .padding(12)
+            BasicAdjustmentsPanelInline(document: document)
+                .padding(12)
         }
         .frame(minWidth: 240)
+    }
+}
+
+struct BasicAdjustmentsPanelInline: View {
+    @Bindable var document: PavementDocument
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            whiteBalanceSection
+            Divider()
+            exposureSection
+            Divider()
+            toneSection
+        }
     }
 
     // MARK: - White Balance
