@@ -52,6 +52,7 @@ struct BasicAdjustmentsPanelInline: View {
                 range: Double(Clamping.Range.temperature.lowerBound)...Double(Clamping.Range.temperature.upperBound),
                 step: 50,
                 format: "%.0fK",
+                defaultValue: 5500,
                 isEnabled: document.recipe.operations.whiteBalance.mode == WhiteBalanceOp.custom
             )
             slider(
@@ -63,6 +64,7 @@ struct BasicAdjustmentsPanelInline: View {
                 range: Double(Clamping.Range.tint.lowerBound)...Double(Clamping.Range.tint.upperBound),
                 step: 1,
                 format: "%.0f",
+                defaultValue: 0,
                 isEnabled: document.recipe.operations.whiteBalance.mode == WhiteBalanceOp.custom
             )
         }
@@ -123,6 +125,7 @@ struct BasicAdjustmentsPanelInline: View {
         range: ClosedRange<Double>,
         step: Double,
         format: String,
+        defaultValue: Double = 0,
         isEnabled: Bool = true
     ) -> some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -132,6 +135,8 @@ struct BasicAdjustmentsPanelInline: View {
                 Text(String(format: format, value.wrappedValue))
                     .font(.callout.monospacedDigit())
                     .foregroundStyle(.secondary)
+                    .onTapGesture(count: 2) { value.wrappedValue = defaultValue }
+                    .help("Double-click to reset")
             }
             Slider(value: value, in: range, step: step)
                 .disabled(!isEnabled)
@@ -141,7 +146,8 @@ struct BasicAdjustmentsPanelInline: View {
     private func intSlider(
         label: String,
         keyPath: WritableKeyPath<ToneOp, Int>,
-        range: ClosedRange<Int> = Clamping.Range.signedHundred
+        range: ClosedRange<Int> = Clamping.Range.signedHundred,
+        defaultValue: Int = 0
     ) -> some View {
         slider(
             label: label,
@@ -151,7 +157,8 @@ struct BasicAdjustmentsPanelInline: View {
             ),
             range: Double(range.lowerBound)...Double(range.upperBound),
             step: 1,
-            format: "%+.0f"
+            format: "%+.0f",
+            defaultValue: Double(defaultValue)
         )
     }
 }

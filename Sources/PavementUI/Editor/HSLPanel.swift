@@ -79,6 +79,7 @@ private struct BandSlider: View {
     let label: String
     let color: Color
     @Binding var value: Int
+    var defaultValue: Int = 0
 
     var body: some View {
         HStack(spacing: 8) {
@@ -100,6 +101,8 @@ private struct BandSlider: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 32, alignment: .trailing)
+                .onTapGesture(count: 2) { value = defaultValue }
+                .help("Double-click to reset")
         }
     }
 }
