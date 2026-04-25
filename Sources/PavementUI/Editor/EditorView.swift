@@ -81,6 +81,10 @@ public struct EditorView: View {
             PresetsPanel(document: document)
         }
         Divider()
+        CollapsibleSection(title: "Match Look", defaultExpanded: false) {
+            MatchLookPanel(document: document)
+        }
+        Divider()
         CollapsibleSection(
             title: "White Balance",
             isModified: ops.whiteBalance != WhiteBalanceOp(),
