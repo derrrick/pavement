@@ -46,14 +46,26 @@ extension PavementCLI {
 
     struct Decode: ParsableCommand {
         static let configuration = CommandConfiguration(
-            abstract: "Decode a RAW file and write a PNG. (Phase 1)"
+            abstract: "Decode a source file and write a PNG."
         )
 
-        @Argument(help: "Source RAW file.") var source: String
+        @Argument(help: "Source RAW or JPEG file.") var source: String
         @Argument(help: "Destination PNG.") var destination: String
 
         func run() throws {
-            throw ValidationError("decode: not yet implemented (Phase 1)")
+            let src = URL(fileURLWithPath: (source as NSString).expandingTildeInPath)
+            let dst = URL(fileURLWithPath: (destination as NSString).expandingTildeInPath)
+
+            let image = try DecodeStage().decode(url: src)
+            try PipelineContext.shared.context.writePNGRepresentation(
+                of: image,
+                to: dst,
+                format: .RGBA8,
+                colorSpace: ColorSpaces.sRGB
+            )
+            let w = Int(image.extent.width.rounded())
+            let h = Int(image.extent.height.rounded())
+            print("Wrote \(dst.path) (\(w)x\(h))")
         }
     }
 
