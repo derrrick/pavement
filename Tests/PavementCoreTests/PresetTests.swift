@@ -21,7 +21,7 @@ final class PresetTests: XCTestCase {
         recipe.operations.crop.y = 0.2
         recipe.operations.crop.w = 0.5
         recipe.operations.crop.h = 0.5
-        recipe.apply(preset: BuiltinPresets.tokyoNight)
+        recipe.apply(preset: BuiltinPresets.tokyoNeonNoir)
 
         XCTAssertEqual(recipe.operations.crop.x, 0.1)
         XCTAssertEqual(recipe.operations.crop.y, 0.2)
@@ -32,29 +32,29 @@ final class PresetTests: XCTestCase {
     func testApplyingPresetPreservesLensCorrection() {
         var recipe = EditRecipe()
         recipe.operations.lensCorrection.enabled = false
-        recipe.apply(preset: BuiltinPresets.classicBW)
+        recipe.apply(preset: BuiltinPresets.parisHenriSilver)
         XCTAssertFalse(recipe.operations.lensCorrection.enabled)
     }
 
     func testBWPresetsDesaturate() {
-        for preset in [BuiltinPresets.classicBW, BuiltinPresets.highContrastBW, BuiltinPresets.softBW] {
+        for preset in [BuiltinPresets.triXPush, BuiltinPresets.moriyama, BuiltinPresets.parisHenriSilver] {
             XCTAssertEqual(preset.operations.color.saturation, -100,
                            "\(preset.name) should fully desaturate")
         }
     }
 
-    func testHighContrastBWHasStrongerCurveThanClassic() {
+    func testMoriyamaHasStrongerContrastThanVivianMaier() {
         XCTAssertGreaterThan(
-            BuiltinPresets.highContrastBW.operations.tone.contrast,
-            BuiltinPresets.classicBW.operations.tone.contrast
+            BuiltinPresets.moriyama.operations.tone.contrast,
+            BuiltinPresets.vivianMaier.operations.tone.contrast
         )
     }
 
-    func testTokyoNightHasGrainAndCoolShadows() {
-        let preset = BuiltinPresets.tokyoNight
+    func testTokyoNeonNoirHasGrainAndCoolShadows() {
+        let preset = BuiltinPresets.tokyoNeonNoir
         XCTAssertGreaterThan(preset.operations.grain.amount, 0)
         XCTAssertGreaterThan(preset.operations.colorGrading.shadows.sat, 0)
-        XCTAssertEqual(preset.operations.colorGrading.shadows.hue, 230)
+        XCTAssertEqual(preset.operations.colorGrading.shadows.hue, 195)
     }
 
     func testApplyingPresetUpdatesModifiedAt() {
@@ -62,7 +62,14 @@ final class PresetTests: XCTestCase {
                                 modifiedAt: Date(timeIntervalSince1970: 0))
         let initial = recipe.modifiedAt
         Thread.sleep(forTimeInterval: 1.1)  // EditRecipe.now() rounds to seconds
-        recipe.apply(preset: BuiltinPresets.tokyoNight)
+        recipe.apply(preset: BuiltinPresets.tokyoNeonNoir)
         XCTAssertGreaterThan(recipe.modifiedAt, initial)
+    }
+
+    func testEachCategoryHasPresets() {
+        let categories = Set(BuiltinPresets.all.map(\.category))
+        XCTAssertTrue(categories.contains("B&W"))
+        XCTAssertTrue(categories.contains("Film"))
+        XCTAssertTrue(categories.contains("Street"))
     }
 }
