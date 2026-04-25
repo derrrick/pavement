@@ -26,13 +26,10 @@ public struct ToneFilter {
 
     /// Build a tone curve that composes contrast / highlights / shadows /
     /// whites / blacks / recovery on top of y = x.
-    /// Each parameter is normalized into a band of input luminance:
-    ///   - blacks (bottom ramp 0..0.30)
-    ///   - shadows (bell at 0.30, σ ≈ 0.18)
-    ///   - contrast (S-curve pivot at 0.50)
-    ///   - highlights (bell at 0.70, σ ≈ 0.18)
-    ///   - whites (top ramp 0.70..1.00)
-    ///   - recovery (top ramp 0.85..1.00, subtractive)
+    /// Each parameter has a band of luminance influence; whites and blacks
+    /// reach further into mid-tones than highlights/shadows so the sliders
+    /// produce a visible response on typical photos (where most pixels live
+    /// between 0.4 and 0.8) instead of only affecting near-clipping values.
     public static func buildCurve(op: ToneOp, samples: Int) -> [Float] {
         let contrast = Float(op.contrast) / 100
         let highlights = Float(op.highlights) / 100
@@ -52,18 +49,21 @@ public struct ToneFilter {
             // Bell curves for shadows / highlights, peak 1.0 at center.
             let shadowBell    = expBell(x: x, center: 0.30, sigma: 0.18)
             let highlightBell = expBell(x: x, center: 0.70, sigma: 0.18)
-            y += shadows    * 0.20 * shadowBell
-            y += highlights * 0.20 * highlightBell
+            y += shadows    * 0.25 * shadowBell
+            y += highlights * 0.25 * highlightBell
 
-            // Endpoint ramps: smooth 0..1 toward the extremes.
-            let blacksRamp = smoothstep(0.30, 0.0, x)  // ramp UP toward x=0
-            let whitesRamp = smoothstep(0.70, 1.0, x)  // ramp UP toward x=1
-            y += blacks * 0.25 * blacksRamp
-            y += whites * 0.25 * whitesRamp
+            // Endpoint ramps: smooth, wide, strong. Whites covers 0.45..1.0,
+            // blacks covers 0..0.55. Mids barely move; the bias is toward
+            // the extremes but not so narrow that typical photos see no
+            // change.
+            let whitesRamp = smoothstep(0.45, 1.0, x)
+            let blacksRamp = smoothstep(0.55, 0.0, x)
+            y += whites * 0.40 * whitesRamp
+            y += blacks * 0.40 * blacksRamp
 
             // Highlight recovery (positive only): pulls the very top down.
-            let recoveryRamp = smoothstep(0.85, 1.0, x)
-            y -= max(0, recovery) * 0.30 * recoveryRamp
+            let recoveryRamp = smoothstep(0.80, 1.0, x)
+            y -= max(0, recovery) * 0.35 * recoveryRamp
 
             result[i] = max(0, min(1, y))
         }
