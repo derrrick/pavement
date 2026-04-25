@@ -34,8 +34,7 @@ public struct Exporter {
         // 1. Decode
         let decoded: CIImage
         if let cachedDecode {
-            cachedDecode.applyLensCorrection = lensCorrection
-            decoded = try cachedDecode.image(for: source)
+            decoded = try cachedDecode.image(for: source, applyLensCorrection: lensCorrection)
         } else {
             decoded = try CachedDecode.realize(url: source, applyLensCorrection: lensCorrection)
         }

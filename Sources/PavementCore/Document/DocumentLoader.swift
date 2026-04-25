@@ -36,7 +36,6 @@ public struct DocumentLoader {
         if recipe.source.fingerprint.isEmpty {
             recipe.source.fingerprint = fingerprint
         }
-        cachedDecode.applyLensCorrection = recipe.operations.lensCorrection.enabled
         if let exif {
             if recipe.source.camera == nil { recipe.source.camera = exif.camera }
             if recipe.source.lens == nil { recipe.source.lens = exif.lens }
@@ -44,9 +43,11 @@ public struct DocumentLoader {
             if recipe.source.captureTime == nil { recipe.source.captureTime = exif.captureTime }
         }
 
-        // Prime the cache off-main so the editor's first render has a bitmap.
+        // Prime the cache with the variant the saved recipe expects, off-main,
+        // so the editor's first render has a bitmap.
+        let lensEnabled = recipe.operations.lensCorrection.enabled
         _ = try await Task.detached(priority: .userInitiated) { () -> Void in
-            _ = try cachedDecode.image(for: url)
+            _ = try cachedDecode.image(for: url, applyLensCorrection: lensEnabled)
         }.value
 
         return PavementDocument(

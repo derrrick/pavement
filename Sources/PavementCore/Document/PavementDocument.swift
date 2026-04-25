@@ -26,11 +26,17 @@ public final class PavementDocument {
         let oldEnabled = oldValue.operations.lensCorrection.enabled
         let newEnabled = recipe.operations.lensCorrection.enabled
         guard oldEnabled != newEnabled else { return }
-        cachedDecode.applyLensCorrection = newEnabled
+        // The new variant might already be cached from an earlier toggle.
+        // If not, prime it off-main; renderRecipe falls back to the old
+        // variant in the meantime so the canvas never blanks.
+        let cache = cachedDecode
         let url = source.url
+        if cache.cached(for: url, applyLensCorrection: newEnabled) != nil {
+            return
+        }
         Task { [weak self] in
             _ = try? await Task.detached(priority: .userInitiated) {
-                _ = try CachedDecode.realize(url: url, applyLensCorrection: newEnabled)
+                _ = try cache.image(for: url, applyLensCorrection: newEnabled)
             }.value
             await MainActor.run {
                 self?.refreshRender()
@@ -75,7 +81,12 @@ public final class PavementDocument {
     }
 
     private func renderRecipe() -> CIImage? {
-        guard let cached = cachedDecode.cached(for: source.url) else { return nil }
+        let lensEnabled = recipe.operations.lensCorrection.enabled
+        // Prefer the matching variant; fall back to the other one while a
+        // toggle re-decode is in flight so the canvas never blanks.
+        let cached = cachedDecode.cached(for: source.url, applyLensCorrection: lensEnabled)
+            ?? cachedDecode.anyCached(for: source.url)
+        guard let cached else { return nil }
         var clamped = recipe
         Clamping.clampInPlace(&clamped)
         return pipeline.apply(clamped, to: cached)
