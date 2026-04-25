@@ -21,7 +21,7 @@ xcuserdata/
 # SwiftPM
 .build/
 .swiftpm/
-Package.resolved
+# Note: Package.resolved is intentionally tracked for reproducible builds.
 
 # Editor
 .vscode/
