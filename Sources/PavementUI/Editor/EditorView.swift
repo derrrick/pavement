@@ -49,11 +49,13 @@ public struct EditorView: View {
                     VStack(alignment: .leading, spacing: 16) {
                         BasicAdjustmentsPanelInline(document: document)
                         Divider()
+                        ToneCurvePanel(document: document)
+                        Divider()
                         HSLPanel(document: document)
                     }
                     .padding(12)
                 }
-                .frame(minWidth: 260, maxWidth: 340)
+                .frame(minWidth: 280, maxWidth: 360)
             }
         } else {
             ProgressView("Loading…")
