@@ -28,7 +28,8 @@ public struct PipelineGraph {
         // §4 step 10: B&W — Phase 6.
         // §4 step 11: Detail — Phase 6.
         // §4 step 12: Effects — Phase 6.
-        // §4 step 13: Crop / rotate — Phase 3.
+        // §4 step 13: Crop / rotate.
+        img = CropFilter().apply(image: img, op: recipe.operations.crop)
 
         return img
     }

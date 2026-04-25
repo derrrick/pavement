@@ -55,6 +55,8 @@ public struct EditorView: View {
                         ToneCurvePanel(document: document)
                         Divider()
                         HSLPanel(document: document)
+                        Divider()
+                        CropPanel(document: document)
                     }
                     .padding(12)
                 }
