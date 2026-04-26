@@ -30,6 +30,7 @@ xcuserdata/
 
 # Claude Code project-local settings (machine-specific)
 .claude/settings.local.json
+.claude/worktrees/
 
 # Pavement runtime artifacts (live next to RAW folders, not in repo)
 _pavement/
