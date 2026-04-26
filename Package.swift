@@ -39,7 +39,14 @@ let package = Package(
         .target(
             name: "PavementUI",
             dependencies: ["PavementCore"],
-            path: "Sources/PavementUI"
+            path: "Sources/PavementUI",
+            resources: [
+                // Bundled Inter (SIL OFL, https://rsms.me/inter/) — used
+                // for the landing-screen wordmark. Registered at runtime
+                // via CTFontManagerRegisterFontsForURL so we don't have
+                // to ship Info.plist UIAppFonts entries.
+                .copy("Resources/Fonts/InterVariable.ttf")
+            ]
         ),
         .executableTarget(
             name: "pavement-cli",

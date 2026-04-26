@@ -288,7 +288,37 @@ public final class PavementDocument {
         if let bandIndex = previewIsolation {
             img = IsolationFilter().apply(image: img, bandIndex: bandIndex)
         }
+        // Rasterization fence for grain. Without baking the recipe output
+        // to a CGImage here, Core Image can fuse the canvas's downstream
+        // scale transform into the grain compute kernel — the noise grid
+        // ends up living in DRAWABLE pixel space, and zoom appears to
+        // slide grain past the image content. Materializing the result
+        // freezes the grain at IMAGE-pixel resolution; after that, the
+        // canvas just stretches a bitmap, so grain scales with the image.
+        // Only paid when grain is active.
+        if !GrainFilter.isIdentity(clamped.operations.grain) {
+            img = bakeToBitmap(img) ?? img
+        }
         return img
+    }
+
+    /// Render `image` through the engine's CIContext into a CGImage at
+    /// the image's full extent and re-wrap as a CIImage. Slightly more
+    /// expensive than a lazy chain (~50ms per 24MP) but it's the only
+    /// reliable way to keep CI from fusing downstream transforms (canvas
+    /// zoom/pan) into the grain dispatch.
+    private func bakeToBitmap(_ image: CIImage) -> CIImage? {
+        let extent = image.extent
+        guard extent.width.isFinite, extent.height.isFinite,
+              extent.width > 0, extent.height > 0 else { return nil }
+        let context = PipelineContext.shared.context
+        guard let cg = context.createCGImage(
+            image,
+            from: extent,
+            format: .RGBAh,                 // half-float — preserves P3 wide gamut
+            colorSpace: ColorSpaces.displayP3
+        ) else { return nil }
+        return CIImage(cgImage: cg)
     }
 
     private func sourceImageForAnalysis() -> CIImage? {

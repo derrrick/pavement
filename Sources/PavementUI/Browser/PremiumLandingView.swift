@@ -27,8 +27,11 @@ struct PremiumLandingView: View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Pavement")
-                    .font(.system(size: 46, weight: .semibold, design: .rounded))
-                    .tracking(0)
+                    // Bundled Inter — registered at app startup.
+                    // Tighter tracking gives the wordmark a more
+                    // editorial / brand feel than SF Pro Rounded did.
+                    .font(.inter(size: 48, weight: .semibold))
+                    .tracking(-1.2)
                 Text("A quiet, premium studio for building photographic looks.")
                     .font(.title3.weight(.medium))
                     .foregroundStyle(.secondary)

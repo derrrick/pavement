@@ -88,38 +88,44 @@ struct PresetsPanel: View {
             }
         } label: {
             HStack(spacing: 0) {
-                Label(state.selectedCategory.rawValue, systemImage: "square.stack.3d.up")
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                Spacer(minLength: 0)
-                // macOS pop-up-button-style affordance: a separator
-                // hairline + a clearly visible chevron in its own raised
-                // pill at the trailing edge. Hard to miss this is a
-                // dropdown.
+                Image(systemName: "square.stack.3d.up")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .padding(.leading, 10)
+                Text(state.selectedCategory.rawValue)
+                    .font(.caption.weight(.semibold))
+                    .padding(.leading, 6)
+                    .padding(.vertical, 8)
+                Spacer(minLength: 8)
+                // Heavy, visually-distinct dropdown affordance — accent
+                // tinted rounded square with a bold chevron, separated
+                // from the label by a hairline. Reads as "clickable
+                // popup" at a glance even on the darkest displays.
                 Rectangle()
                     .fill(Theme.borderSubtle)
                     .frame(width: 1)
                 ZStack {
-                    RoundedRectangle(cornerRadius: 4, style: .continuous)
-                        .fill(Color.white.opacity(0.05))
+                    RoundedRectangle(cornerRadius: 5, style: .continuous)
+                        .fill(Color.accentColor.opacity(0.18))
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundStyle(Color.primary.opacity(0.85))
+                        .font(.system(size: 13, weight: .heavy))
+                        .foregroundStyle(Color.accentColor)
                 }
-                .frame(width: 22, height: 22)
-                .padding(.trailing, 4)
+                .frame(width: 26, height: 26)
+                .padding(.trailing, 3)
             }
-            .font(.caption.weight(.semibold))
-            .frame(minHeight: 30)
+            .frame(minHeight: 32)
             .background(Theme.surfaceInset, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(Theme.borderSubtle, lineWidth: 1)
+                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
             )
+            .contentShape(Rectangle())
         }
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
+        .help("Switch style library")
         #if os(macOS)
         .cursorOnHover()
         #endif
