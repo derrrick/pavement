@@ -54,9 +54,12 @@ struct PresetsPanel: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
+            Label("Style Browser", systemImage: "wand.and.stars")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
             HStack {
-                Label("Style Browser", systemImage: "wand.and.stars")
-                    .font(.caption.weight(.semibold))
+                Text("Style Strength")
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
                 Spacer()
                 Text("\(Int((state.amount * 100).rounded()))")

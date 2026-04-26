@@ -56,9 +56,13 @@ final class StyleBrowserState {
     var selectedCategory: StyleBrowserCategory = .builtIn
     var searchText = ""
     var previewedStyleID: String?
+    // NOTE: do not self-assign inside `didSet`. The `@Observable` macro
+    // rewrites stored properties through the observation registrar, so
+    // `amount = clamped` re-enters the setter and recurses to a stack
+    // overflow when the user drags the strength slider. The slider is
+    // bound `in: 0...1`, so clamp at init and trust the binding.
     var amount: Double {
         didSet {
-            amount = min(max(amount, 0), 1)
             defaults.set(amount, forKey: Self.amountKey)
         }
     }
@@ -74,7 +78,8 @@ final class StyleBrowserState {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        self.amount = defaults.object(forKey: Self.amountKey) as? Double ?? 1.0
+        let stored = defaults.object(forKey: Self.amountKey) as? Double ?? 1.0
+        self.amount = min(max(stored, 0), 1)
         self.favorites = Set(defaults.stringArray(forKey: Self.favoritesKey) ?? [])
         self.recentStyleIDs = defaults.stringArray(forKey: Self.recentKey) ?? []
     }
