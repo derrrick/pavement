@@ -41,7 +41,7 @@
       "sharpRadius" : 1.0
     },
     "exposure" : { "ev" : 0.0 },
-    "grain" : { "amount" : 0, "roughness" : 50, "size" : 25 },
+    "grain" : { "amount" : 0, "roughness" : 50, "size" : 25, "type" : "fine" },
     "hsl" : {
       "aqua" : { "h" : 0, "l" : 0, "s" : 0 },
       "blue" : { "h" : 0, "l" : 0, "s" : 0 },

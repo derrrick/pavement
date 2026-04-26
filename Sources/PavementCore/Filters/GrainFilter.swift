@@ -2,23 +2,21 @@ import Foundation
 import CoreImage
 import CoreImage.CIFilterBuiltins
 
-/// Procedural film grain. Six visually distinct types that aim to feel
-/// like real silver / dye grain rather than tiled noise.
+/// Procedural film grain. Each type pairs a real noise algorithm
+/// (Voronoi / Perlin / Simplex / Value / Uniform / Gaussian) with a
+/// shaping pipeline (blur, contrast, anisotropy) to recreate a
+/// recognisable film/digital look.
 ///
-/// Two earlier sins, now fixed:
-///   1. `CIPixellate` was used for most types — it tiles the image into a
-///      regular grid of cells, which the eye reads as a repeating texture
-///      ("blocky" grain). Cubic / Silver Rich / Plate now use raw
-///      per-pixel noise plus selective Gaussian blur instead.
-///   2. The noise origin was always (0,0), so every image got the same
-///      noise pattern. We now translate the noise by a per-image offset
-///      derived from the image extent — different photos get visually
-///      different grain, same photo stays stable across renders.
+/// The base noise is generated on CPU at a moderate resolution (768²)
+/// and Lanczos-upsampled to the image extent — much better quality
+/// than CIRandomGenerator + Pixellate, no visible tile pattern, and the
+/// generated noise is cached so slider-drags on `amount` reuse the same
+/// texture instead of regenerating per frame.
 ///
 /// Real-film signature retained: luminance weighting via a bell-curve
 /// gradient (peaks in midtones for most types, in shadows for Silver
-/// Rich), so clipped extremes get ~no grain — matches what Fujifilm's
-/// in-camera grain effect does.
+/// Rich), so clipped extremes get ~no grain — matches Fujifilm's
+/// in-camera grain effect.
 public struct GrainFilter {
     public init() {}
 
@@ -28,12 +26,18 @@ public struct GrainFilter {
         guard extent.width.isFinite, extent.height.isFinite,
               extent.width > 0, extent.height > 0 else { return image }
 
+        // 1. Generate the per-type grain texture (gray, centered around 0.5)
+        //    at the source extent.
         let grainBase = generateGrain(extent: extent, op: op)
+
+        // 2. Weight by image luminance — bell curve peaking at midtones
+        //    (or shadows for Silver Rich).
         let lumaMask = makeLumaMask(image: image, type: op.type)
         let weighted = grainBase.applyingFilter("CIMultiplyCompositing", parameters: [
             kCIInputBackgroundImageKey: lumaMask
         ])
 
+        // 3. Sign + intensity scale, then add to image.
         let intensity = CGFloat(op.amount) / 100.0 * 0.65
         let signed = weighted.applyingFilter("CIColorMatrix", parameters: [
             "inputRVector": CIVector(x: intensity * 2, y: 0, z: 0, w: 0),
@@ -51,105 +55,55 @@ public struct GrainFilter {
         op.amount == 0
     }
 
-    // MARK: - Per-image noise base
+    // MARK: - Noise dispatch
 
-    /// Generates the per-image random noise. The noise is translated by a
-    /// deterministic per-image offset (hashed from the image extent) so
-    /// different sources get different patterns while a single source's
-    /// grain stays stable across renders.
-    private func baseNoise(extent: CGRect) -> CIImage {
-        let raw = CIFilter.randomGenerator().outputImage ?? CIImage(color: .gray)
+    /// Pull a noise texture from ProceduralNoise (cached by params),
+    /// upscale to the image extent, and run per-type shaping. Newsprint
+    /// is special-cased to use CIDotScreen instead of a noise sample.
+    private func generateGrain(extent: CGRect, op: GrainOp) -> CIImage {
+        let size = CGFloat(op.size) / 100        // 0..1
+        let roughness = CGFloat(op.roughness) / 100 // 0..1
 
-        // Pseudo-random per-image offset to break the (0,0) tile alignment.
-        // Different image dimensions → different offset → distinct grain.
-        let w = Int(extent.width)
-        let h = Int(extent.height)
-        let offsetX = CGFloat((w &* 31 &+ h &* 47) % 997)
-        let offsetY = CGFloat((w &* 53 &+ h &* 71) % 991)
+        if op.type == GrainOp.typeNewsprint {
+            return newsprintGrain(extent: extent, size: size, roughness: roughness)
+        }
 
-        return raw
+        let spec = typeSpec(for: op.type)
+        guard let baseTexture = ProceduralNoise.image(
+            algorithm: spec.algorithm,
+            scale: spec.scale(Float(size)),
+            octaves: spec.octaves(Float(roughness)),
+            seed: 0xA1B2C3D4
+        ) else {
+            return CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5)).cropped(to: extent)
+        }
+
+        // Upscale the 768² noise texture to the image extent. Per-image
+        // noise variation comes from the offset jitter we apply below.
+        let scaleX = extent.width / baseTexture.extent.width
+        let scaleY = extent.height / baseTexture.extent.height
+        let scale = max(scaleX, scaleY)
+
+        let offsetX = CGFloat((Int(extent.width) &* 31 &+ Int(extent.height) &* 47) % 997)
+        let offsetY = CGFloat((Int(extent.width) &* 53 &+ Int(extent.height) &* 71) % 991)
+
+        var upscaled = baseTexture
+            .applyingFilter("CILanczosScaleTransform", parameters: [
+                kCIInputScaleKey: scale,
+                kCIInputAspectRatioKey: 1.0
+            ])
             .transformed(by: CGAffineTransform(translationX: offsetX, y: offsetY))
             .cropped(to: extent)
-            .applyingFilter("CIColorMonochrome", parameters: [
-                kCIInputColorKey: CIColor(red: 0.5, green: 0.5, blue: 0.5),
-                kCIInputIntensityKey: 1.0
-            ])
+
+        // Shape: motion blur for tabular, contrast push for harsh, etc.
+        upscaled = spec.shape(upscaled, size, roughness)
+
+        return upscaled
     }
 
-    // MARK: - Per-type generators
-
-    private func generateGrain(extent: CGRect, op: GrainOp) -> CIImage {
-        let noise = baseNoise(extent: extent)
-        let size = CGFloat(op.size) / 100         // 0..1
-        let roughness = CGFloat(op.roughness) / 100  // 0..1
-
-        switch op.type {
-        case GrainOp.typeCubic:      return cubic(noise, size: size, roughness: roughness)
-        case GrainOp.typeTabular:    return tabular(noise, size: size, roughness: roughness)
-        case GrainOp.typeNewsprint:  return newsprint(extent: extent, size: size, roughness: roughness)
-        case GrainOp.typeSilverRich: return silverRich(noise, size: size, roughness: roughness)
-        case GrainOp.typeSoft:       return soft(noise, size: size, roughness: roughness)
-        case GrainOp.typePlate:      return plate(noise, size: size, roughness: roughness)
-        default:                     return cubic(noise, size: size, roughness: roughness)
-        }
-    }
-
-    /// **Cubic** — classic sharp silver-halide grain. Per-pixel random
-    /// noise with a slight Gaussian softening; we layer a wider-blurred
-    /// copy in to add organic clumping (a two-octave fBm-style blend) so
-    /// the grain doesn't read as flat hash noise.
-    private func cubic(_ noise: CIImage, size: CGFloat, roughness: CGFloat) -> CIImage {
-        let fineRadius = max(0.4, 0.4 + size * 1.4)
-        let coarseRadius = max(2.0, 2.0 + size * 6.0)
-
-        let fine = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: fineRadius])
-            .cropped(to: noise.extent)
-
-        let coarse = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: coarseRadius])
-            .cropped(to: noise.extent)
-            .applyingFilter("CIColorMatrix", parameters: [
-                // Coarse layer rides at 35% alpha so it modulates without
-                // dominating — gives clumpy "developed" look.
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.35)
-            ])
-
-        let combined = coarse
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: fine
-            ])
-            .cropped(to: noise.extent)
-
-        return combined.applyingFilter("CIColorControls", parameters: [
-            kCIInputContrastKey: 1.7 + roughness * 0.7,
-            kCIInputSaturationKey: 0.0
-        ])
-    }
-
-    /// **Tabular** — modern T-grain: heavy directional motion blur creates
-    /// elongated, anisotropic streaks. Different from cubic at any size.
-    private func tabular(_ noise: CIImage, size: CGFloat, roughness: CGFloat) -> CIImage {
-        let streakLength = max(2.0, 2.5 + size * 9)
-        return noise
-            .applyingFilter("CIMotionBlur", parameters: [
-                kCIInputRadiusKey: streakLength,
-                kCIInputAngleKey: 0.05  // near-horizontal
-            ])
-            .cropped(to: noise.extent)
-            .applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 1.4 + roughness * 0.5,
-                kCIInputSaturationKey: 0.0
-            ])
-    }
-
-    /// **Newsprint** — actual ordered halftone via `CIDotScreen` over a
-    /// flat gray plate. Genuinely regular dots — that's the look — but
-    /// distinctly NOT random noise, which is the whole point of the type.
-    private func newsprint(extent: CGRect, size: CGFloat, roughness: CGFloat) -> CIImage {
-        // CIDotScreen draws halftone dots whose density is driven by the
-        // input image's luminance. A flat 0.5 gray gives uniform-density
-        // dots — a clean halftone screen.
+    /// Newsprint: actual ordered halftone via CIDotScreen on flat gray.
+    /// Genuinely regular dots — that's the look.
+    private func newsprintGrain(extent: CGRect, size: CGFloat, roughness: CGFloat) -> CIImage {
         let gray = CIImage(color: CIColor(red: 0.5, green: 0.5, blue: 0.5))
             .cropped(to: extent)
         let dotWidth = max(2.5, 3.0 + size * 10)
@@ -167,92 +121,247 @@ public struct GrainFilter {
             ])
     }
 
-    /// **Silver Rich** — heavier crystals than Cubic, paired with a luma
-    /// mask that pushes most of the grain into the shadows. Same fBm
-    /// trick as Cubic but biased toward the coarse layer.
-    private func silverRich(_ noise: CIImage, size: CGFloat, roughness: CGFloat) -> CIImage {
-        let fineRadius = max(0.6, 0.8 + size * 2.0)
-        let coarseRadius = max(3.0, 4.0 + size * 8.0)
+    // MARK: - Per-type spec
 
-        let fine = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: fineRadius])
-            .cropped(to: noise.extent)
-
-        let coarse = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: coarseRadius])
-            .cropped(to: noise.extent)
-            .applyingFilter("CIColorMatrix", parameters: [
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.55)
-            ])
-
-        let combined = coarse
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: fine
-            ])
-            .cropped(to: noise.extent)
-
-        return combined.applyingFilter("CIColorControls", parameters: [
-            kCIInputContrastKey: 2.0 + roughness * 0.9,
-            kCIInputSaturationKey: 0.0
-        ])
+    /// One spec per grain type — tells us which noise algorithm to feed,
+    /// how to derive scale + octaves from the size/roughness sliders, and
+    /// what shaping to apply afterwards.
+    private struct TypeSpec {
+        let algorithm: ProceduralNoise.Algorithm
+        let scale: (Float) -> Float            // size 0..1 → noise scale
+        let octaves: (Float) -> Int            // roughness 0..1 → octaves
+        let shape: (CIImage, CGFloat, CGFloat) -> CIImage
     }
 
-    /// **Soft** — pure low-frequency diffusion. A wide Gaussian rolls the
-    /// per-pixel noise into atmospheric texture rather than per-pixel
-    /// grain. Almost subliminal; reads as "atmosphere".
-    private func soft(_ noise: CIImage, size: CGFloat, roughness: CGFloat) -> CIImage {
-        let blurRadius = max(3.0, 4.0 + size * 14)
-        return noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blurRadius])
-            .cropped(to: noise.extent)
-            .applyingFilter("CIColorControls", parameters: [
-                kCIInputContrastKey: 0.85 + roughness * 0.5,
-                kCIInputSaturationKey: 0.0
-            ])
-    }
+    private func typeSpec(for type: String) -> TypeSpec {
+        switch type {
 
-    /// **Plate** — wet-collodion: large irregular blob structures with
-    /// finer texture inside. Built from THREE noise layers at descending
-    /// scales (huge / medium / small) blended together so the overall
-    /// pattern is coarse but not blocky and not regular.
-    private func plate(_ noise: CIImage, size: CGFloat, roughness: CGFloat) -> CIImage {
-        let macroRadius = max(8.0, 12.0 + size * 24.0)
-        let midRadius = max(3.0, 4.0 + size * 8.0)
-        let microRadius = max(0.5, 0.6 + size * 1.5)
+        case GrainOp.typeFine:
+            // Fine modern digital grain: per-pixel uniform with light
+            // contrast lift. Sharp, neutral, no clumping.
+            return TypeSpec(
+                algorithm: .uniform,
+                scale: { _ in 1.0 },
+                octaves: { _ in 1 },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.4 + rough * 0.5,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
 
-        let macro = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: macroRadius])
-            .cropped(to: noise.extent)
+        case GrainOp.typeCubic:
+            // T-MAX-style cubic: value noise gives crisp, sharply-defined
+            // grain shapes; tighter contrast for crystal definition.
+            return TypeSpec(
+                algorithm: .value,
+                scale: { 0.3 + $0 * 1.2 },
+                octaves: { 1 + Int($0 * 3) },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.7 + rough * 0.6,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
 
-        let mid = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: midRadius])
-            .cropped(to: noise.extent)
-            .applyingFilter("CIColorMatrix", parameters: [
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.45)
-            ])
+        case GrainOp.typeTabular:
+            // T-grain: Perlin smoothness + horizontal motion blur for the
+            // anisotropic platelet shape.
+            return TypeSpec(
+                algorithm: .perlin,
+                scale: { 0.4 + $0 * 1.0 },
+                octaves: { 1 + Int($0 * 2) },
+                shape: { img, sz, rough in
+                    let streak = max(2.0, 3.0 + sz * 9)
+                    return img
+                        .applyingFilter("CIMotionBlur", parameters: [
+                            kCIInputRadiusKey: streak,
+                            kCIInputAngleKey: 0.05
+                        ])
+                        .cropped(to: img.extent)
+                        .applyingFilter("CIColorControls", parameters: [
+                            kCIInputContrastKey: 1.4 + rough * 0.5,
+                            kCIInputSaturationKey: 0.0
+                        ])
+                }
+            )
 
-        let micro = noise
-            .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: microRadius])
-            .cropped(to: noise.extent)
-            .applyingFilter("CIColorMatrix", parameters: [
-                "inputAVector": CIVector(x: 0, y: 0, z: 0, w: 0.30)
-            ])
+        case GrainOp.typeSilverRich:
+            // Silver halide: Voronoi cells map onto crystalline silver
+            // grains. Slight Gaussian round-off so cell boundaries aren't
+            // razor-sharp; high contrast.
+            return TypeSpec(
+                algorithm: .voronoi,
+                scale: { 0.5 + $0 * 1.5 },
+                octaves: { _ in 1 },
+                shape: { img, sz, rough in
+                    img
+                        .applyingFilter("CIGaussianBlur", parameters: [
+                            kCIInputRadiusKey: 0.5 + sz * 1.0
+                        ])
+                        .cropped(to: img.extent)
+                        .applyingFilter("CIColorControls", parameters: [
+                            kCIInputContrastKey: 2.0 + rough * 0.9,
+                            kCIInputSaturationKey: 0.0
+                        ])
+                }
+            )
 
-        let midOnMacro = mid
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: macro
-            ])
-            .cropped(to: noise.extent)
-        let combined = micro
-            .applyingFilter("CISourceOverCompositing", parameters: [
-                kCIInputBackgroundImageKey: midOnMacro
-            ])
-            .cropped(to: noise.extent)
+        case GrainOp.typeSoft:
+            // Diffuse atmospheric grain: smooth Perlin + heavy Gaussian.
+            return TypeSpec(
+                algorithm: .perlin,
+                scale: { 0.6 + $0 * 1.5 },
+                octaves: { _ in 1 },
+                shape: { img, sz, rough in
+                    let blur = max(3.0, 4.0 + sz * 14)
+                    return img
+                        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blur])
+                        .cropped(to: img.extent)
+                        .applyingFilter("CIColorControls", parameters: [
+                            kCIInputContrastKey: 0.85 + rough * 0.5,
+                            kCIInputSaturationKey: 0.0
+                        ])
+                }
+            )
 
-        return combined.applyingFilter("CIColorControls", parameters: [
-            kCIInputContrastKey: 1.5 + roughness * 0.7,
-            kCIInputSaturationKey: 0.0
-        ])
+        case GrainOp.typeCameraRaw:
+            // Camera Raw–style: classic fBm via multi-octave Perlin where
+            // roughness drives the octave count (fractal complexity).
+            return TypeSpec(
+                algorithm: .perlin,
+                scale: { 0.4 + $0 * 1.4 },
+                octaves: { 2 + Int($0 * 4) },     // 2..6 octaves
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.5 + rough * 0.6,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typeHarsh:
+            // Pushed film: per-pixel uniform with extreme contrast → the
+            // grain is gritty and chunky-looking even at low amount.
+            return TypeSpec(
+                algorithm: .uniform,
+                scale: { _ in 1.0 },
+                octaves: { _ in 1 },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 2.5 + rough * 1.5,
+                        kCIInputBrightnessKey: -0.05,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typePlate:
+            // Wet-collodion: huge Voronoi cells with a soft Gaussian to
+            // round the blob edges into organic patches.
+            return TypeSpec(
+                algorithm: .voronoi,
+                scale: { 1.5 + $0 * 2.0 },
+                octaves: { _ in 1 },
+                shape: { img, sz, rough in
+                    let blur = max(3.0, 4.0 + sz * 6)
+                    return img
+                        .applyingFilter("CIGaussianBlur", parameters: [kCIInputRadiusKey: blur])
+                        .cropped(to: img.extent)
+                        .applyingFilter("CIColorControls", parameters: [
+                            kCIInputContrastKey: 1.4 + rough * 0.6,
+                            kCIInputSaturationKey: 0.0
+                        ])
+                }
+            )
+
+        // Pure-algorithm types: surface the raw noise with minimal shaping
+        // so power users can pick a primitive directly.
+
+        case GrainOp.typeUniform:
+            return TypeSpec(
+                algorithm: .uniform,
+                scale: { _ in 1.0 },
+                octaves: { _ in 1 },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.0 + rough * 0.6,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typeGaussian:
+            return TypeSpec(
+                algorithm: .gaussian,
+                scale: { _ in 1.0 },
+                octaves: { _ in 1 },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.2 + rough * 0.5,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typePerlin:
+            return TypeSpec(
+                algorithm: .perlin,
+                scale: { 0.4 + $0 * 1.5 },
+                octaves: { 1 + Int($0 * 5) },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.3 + rough * 0.5,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typeSimplex:
+            return TypeSpec(
+                algorithm: .simplex,
+                scale: { 0.4 + $0 * 1.5 },
+                octaves: { 1 + Int($0 * 5) },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.3 + rough * 0.5,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typeValue:
+            return TypeSpec(
+                algorithm: .value,
+                scale: { 0.5 + $0 * 1.5 },
+                octaves: { 1 + Int($0 * 4) },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.5 + rough * 0.5,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        case GrainOp.typeVoronoi:
+            return TypeSpec(
+                algorithm: .voronoi,
+                scale: { 0.5 + $0 * 2.0 },
+                octaves: { _ in 1 },
+                shape: { img, _, rough in
+                    img.applyingFilter("CIColorControls", parameters: [
+                        kCIInputContrastKey: 1.6 + rough * 0.6,
+                        kCIInputSaturationKey: 0.0
+                    ])
+                }
+            )
+
+        default:
+            // Fallback: Fine
+            return typeSpec(for: GrainOp.typeFine)
+        }
     }
 
     // MARK: - Luminance weighting
@@ -271,6 +380,7 @@ public struct GrainFilter {
         case GrainOp.typeSilverRich: peakLuma = 0.30; bandWidth = 0.45
         case GrainOp.typeNewsprint:  peakLuma = 0.50; bandWidth = 0.70
         case GrainOp.typeSoft:       peakLuma = 0.50; bandWidth = 0.65
+        case GrainOp.typeHarsh:      peakLuma = 0.50; bandWidth = 0.60
         default:                     peakLuma = 0.50; bandWidth = 0.55
         }
 
