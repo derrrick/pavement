@@ -32,13 +32,17 @@ struct GrainParams {
     int32_t type;       // 0..5
     uint32_t seed;      // per-image seed
     // Absolute image-extent origin of the current tile's output region.
-    // Set in GrainProcessor.process() per-dispatch — lets the kernel
-    // compute noise position in image-extent space rather than tile-local
-    // thread coords. Critical for two reasons: (1) seamless across tiles,
-    // (2) the grain pattern stays welded to image pixels when the canvas
-    // applies a downstream zoom/pan transform.
+    // Set in GrainProcessor.process() per-dispatch.
     float originX;
     float originY;
+    // extent_units_per_texture_pixel along each axis. = 1 when CI hasn't
+    // fused a downstream scale; > 1 when CI shrunk the destination
+    // texture to fit a zoom-out (one texture pixel covers many extent
+    // units). Multiplying gid by this keeps `pos` measured in IMAGE
+    // EXTENT units regardless of texture resolution — that's what locks
+    // the noise grid to image pixels under canvas zoom.
+    float extentScaleX;
+    float extentScaleY;
 };
 
 // ------------------------------------------------------------
@@ -162,12 +166,15 @@ kernel void grainKernel(
     // colorimetry pass, it's a visibility weighting).
     float luma = dot(c.rgb, float3(0.2126f, 0.7152f, 0.0722f));
 
-    // Absolute image-extent coordinate. Adding the tile's region origin
-    // means tile (0,0) of one batch and tile (512,0) of the next compute
-    // continuous noise — no seams. It also keeps the noise locked to a
-    // fixed image-pixel grid, so a downstream canvas scale moves the
-    // grain together with the image content (as Capture One does).
-    float2 pos = float2(gid) + float2(p.originX, p.originY);
+    // Convert tile-local gid into ABSOLUTE image-extent coordinates so
+    // the noise grid stays welded to image pixels regardless of how CI
+    // tiled (origin) or sized (extentScale) this dispatch's destination
+    // texture. extentScale is normally 1; it becomes >1 when CI fused a
+    // downstream canvas scale into the kernel call — without this term,
+    // gid steps would cover fewer-than-1 extent unit each and the grain
+    // would float independently of the image.
+    float2 pos = float2(p.originX, p.originY)
+               + float2(gid) * float2(p.extentScaleX, p.extentScaleY);
     float n;
     switch (p.type) {
         case 0:  n = fineNoise(pos,       p.granularity, p.seed); break;

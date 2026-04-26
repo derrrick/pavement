@@ -40,10 +40,13 @@ public struct GrainFilter {
             falloff: falloff,
             type: typeIndex,
             seed: seed,
-            // originX/Y are stamped per-dispatch from output.region.origin
-            // in GrainProcessor.process — the values here are unused.
+            // origin + extentScale are stamped per-dispatch in
+            // GrainProcessor.process() from output.region and the
+            // destination texture dimensions. The values here are unused.
             originX: 0,
-            originY: 0
+            originY: 0,
+            extentScaleX: 1,
+            extentScaleY: 1
         )
         return GrainProcessor.apply(image: image, params: params)
     }

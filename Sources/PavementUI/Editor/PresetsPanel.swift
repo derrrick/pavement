@@ -87,20 +87,30 @@ struct PresetsPanel: View {
                 }
             }
         } label: {
-            HStack(spacing: 6) {
+            HStack(spacing: 0) {
                 Label(state.selectedCategory.rawValue, systemImage: "square.stack.3d.up")
-                Spacer()
-                // Was a faint .tertiary chevron — easy to miss against
-                // the inset background. Bumped to a filled chevron with
-                // accent-tinted secondary color so the dropdown reads
-                // unambiguously as one.
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                Spacer(minLength: 0)
+                // macOS pop-up-button-style affordance: a separator
+                // hairline + a clearly visible chevron in its own raised
+                // pill at the trailing edge. Hard to miss this is a
+                // dropdown.
+                Rectangle()
+                    .fill(Theme.borderSubtle)
+                    .frame(width: 1)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4, style: .continuous)
+                        .fill(Color.white.opacity(0.05))
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(Color.primary.opacity(0.85))
+                }
+                .frame(width: 22, height: 22)
+                .padding(.trailing, 4)
             }
             .font(.caption.weight(.semibold))
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
+            .frame(minHeight: 30)
             .background(Theme.surfaceInset, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
             .overlay(
                 RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
@@ -110,6 +120,9 @@ struct PresetsPanel: View {
         .menuStyle(.borderlessButton)
         .menuIndicator(.hidden)
         .buttonStyle(.plain)
+        #if os(macOS)
+        .cursorOnHover()
+        #endif
     }
 
     @ViewBuilder

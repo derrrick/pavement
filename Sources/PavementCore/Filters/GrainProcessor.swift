@@ -15,11 +15,20 @@ final class GrainProcessor: CIImageProcessorKernel {
 
     /// Mirrors GrainParams in GrainKernel.metal — keep field order in sync.
     ///
-    /// `originX/Y` are populated per-tile inside `process(...)` from
-    /// `output.region.origin`. They give the kernel absolute image-extent
-    /// coordinates, which is what makes the noise look stable across
-    /// tiling AND makes the grain pattern stay locked to the image when
-    /// the canvas applies a zoom/pan transform downstream.
+    /// `originX/Y` and `extentScaleX/Y` are populated per-dispatch inside
+    /// `process(...)` from `output.region` and the destination texture
+    /// dimensions. Together they let the kernel translate its tile-local
+    /// `gid` into ABSOLUTE IMAGE-EXTENT coordinates regardless of how CI
+    /// tiled or fused downstream transforms:
+    ///
+    ///     pos_extent = (originX, originY) + gid * (extentScaleX, extentScaleY)
+    ///
+    /// When CI hasn't fused (texture matches region 1:1), extentScale = 1
+    /// and pos_extent = origin + gid. When CI has fused a downstream
+    /// canvas scale (e.g. drawable is 1500×1000 but kernel's extent rect
+    /// is 6000×4000), texture is smaller than region and extentScale = 4
+    /// — gid steps still cover 1 extent unit each, so the noise grid
+    /// stays welded to image pixels and zooms with them.
     struct Params {
         var amount: Float
         var granularity: Float
@@ -29,6 +38,8 @@ final class GrainProcessor: CIImageProcessorKernel {
         var seed: UInt32
         var originX: Float
         var originY: Float
+        var extentScaleX: Float
+        var extentScaleY: Float
     }
 
     /// Lazy pipeline state. Compiles the kernel once at first use, caches
@@ -114,12 +125,22 @@ final class GrainProcessor: CIImageProcessorKernel {
             throw NSError(domain: "GrainProcessor", code: 3,
                           userInfo: [NSLocalizedDescriptionKey: "Could not create encoder"])
         }
-        // Stamp this tile's absolute origin into the params so the kernel
-        // computes noise in image-extent coordinates instead of tile-local
-        // gid. Without this: tile boundaries showed seams AND the grain
-        // pattern detached from the image when the canvas scaled it.
+        // Stamp this dispatch's extent rect AND the texture-to-extent
+        // ratio into the params. CI may give us a destination texture
+        // that is SMALLER than `output.region` when it has fused a
+        // downstream scale (e.g. canvas zoom-out). In that case one
+        // texture pixel covers >1 extent unit, so the kernel must scale
+        // gid steps by `region.size / texture.size` to keep the noise
+        // grid measured in IMAGE-EXTENT units. That's what makes the
+        // grain stay welded to image pixels when the user zooms.
+        let regionWidth  = Float(output.region.width)
+        let regionHeight = Float(output.region.height)
+        let texW = Float(max(1, outTex.width))
+        let texH = Float(max(1, outTex.height))
         params.originX = Float(output.region.minX)
         params.originY = Float(output.region.minY)
+        params.extentScaleX = regionWidth / texW
+        params.extentScaleY = regionHeight / texH
 
         encoder.setComputePipelineState(pipeline)
         encoder.setTexture(inTex,  index: 0)
