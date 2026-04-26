@@ -358,38 +358,18 @@ public struct DetailOp: Codable, Equatable {
 }
 
 public struct GrainOp: Equatable {
-    // Curated grain "looks" — combine an underlying noise algorithm with
-    // shaping (blur, contrast, anisotropy) to recreate film/digital looks.
-    public static let typeFine       = "fine"        // uniform per-pixel
-    public static let typeCubic      = "cubic"       // value noise, T-MAX-ish
-    public static let typeTabular    = "tabular"     // Perlin + motion blur
-    public static let typeSilverRich = "silverRich"  // Voronoi, shadow-heavy
-    public static let typeSoft       = "soft"        // Perlin, diffuse
-    public static let typeCameraRaw  = "cameraRaw"   // multi-octave Perlin (fBm)
-    public static let typeHarsh      = "harsh"       // uniform + extreme contrast
-    public static let typeNewsprint  = "newsprint"   // CIDotScreen halftone
-    public static let typePlate      = "plate"       // Voronoi at large scale
+    // Six classic grain types. Each shapes the same per-pixel random
+    // noise through type-specific blur + contrast settings.
+    public static let typeFine       = "fine"        // modern digital, uniform
+    public static let typeCubic      = "cubic"       // T-MAX-style sharp
+    public static let typeTabular    = "tabular"     // anisotropic platelet
+    public static let typeSilverRich = "silverRich"  // dense silver halide
+    public static let typeSoft       = "soft"        // diffused portrait grain
+    public static let typeHarsh      = "harsh"       // pushed-film grit
 
-    // Pure noise algorithms — power-user picks for direct control.
-    public static let typeUniform  = "uniform"
-    public static let typeGaussian = "gaussian"
-    public static let typePerlin   = "perlin"
-    public static let typeSimplex  = "simplex"
-    public static let typeValue    = "value"
-    public static let typeVoronoi  = "voronoi"
-
-    /// Curated "looks" in the order they appear in the picker.
-    public static let lookTypes: [String] = [
-        typeFine, typeCameraRaw, typeCubic, typeTabular,
-        typeSilverRich, typeSoft, typeHarsh, typeNewsprint, typePlate
+    public static let allTypes: [String] = [
+        typeFine, typeCubic, typeTabular, typeSilverRich, typeSoft, typeHarsh
     ]
-
-    /// Pure algorithms in the order they appear in the picker.
-    public static let algorithmTypes: [String] = [
-        typeUniform, typeGaussian, typePerlin, typeSimplex, typeValue, typeVoronoi
-    ]
-
-    public static let allTypes: [String] = lookTypes + algorithmTypes
 
     public var amount: Int
     public var size: Int
