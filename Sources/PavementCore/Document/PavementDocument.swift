@@ -269,10 +269,14 @@ public final class PavementDocument {
 
     private func renderRecipe() -> CIImage? {
         let activeRecipe = previewRecipe ?? recipe
-        return renderRecipe(using: activeRecipe)
+        // Renders driven by an in-flight preview (style-strength slider,
+        // hover) skip the grain materialization fence — see
+        // renderRecipe(using:interactive:) for the trade-off.
+        let isInteractive = previewRecipe != nil
+        return renderRecipe(using: activeRecipe, interactive: isInteractive)
     }
 
-    private func renderRecipe(using activeRecipe: EditRecipe) -> CIImage? {
+    private func renderRecipe(using activeRecipe: EditRecipe, interactive: Bool = false) -> CIImage? {
         let lensEnabled = activeRecipe.operations.lensCorrection.enabled
         // Prefer the matching variant; fall back to the other one while a
         // toggle re-decode is in flight so the canvas never blanks.
@@ -280,7 +284,17 @@ public final class PavementDocument {
             ?? cachedDecode.anyCached(for: source.url)
         guard let cached else { return nil }
         if showBefore {
-            return cached
+            // "Before" means the un-edited look, but the framing must
+            // match the user's current view. Keep crop + lens correction
+            // (geometry/extent) and clear every photographic op, then
+            // pipeline it so the result has identical extent to "after"
+            // — current zoom/pan stays put when toggling.
+            var beforeRecipe = activeRecipe
+            beforeRecipe.operations = Operations(
+                crop: activeRecipe.operations.crop,
+                lensCorrection: activeRecipe.operations.lensCorrection
+            )
+            return pipeline.apply(beforeRecipe, to: cached)
         }
         var clamped = activeRecipe
         Clamping.clampInPlace(&clamped)
@@ -295,8 +309,11 @@ public final class PavementDocument {
         // slide grain past the image content. Materializing the result
         // freezes the grain at IMAGE-pixel resolution; after that, the
         // canvas just stretches a bitmap, so grain scales with the image.
-        // Only paid when grain is active.
-        if !GrainFilter.isIdentity(clamped.operations.grain) {
+        // ~50ms per 24MP, so we skip it on interactive renders (slider
+        // drags etc.) — grain may visibly slide during the drag, but the
+        // commit path renders without `interactive` and the bake runs
+        // once the user releases.
+        if !interactive, !GrainFilter.isIdentity(clamped.operations.grain) {
             img = bakeToBitmap(img) ?? img
         }
         return img

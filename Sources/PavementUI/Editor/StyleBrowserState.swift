@@ -62,7 +62,7 @@ final class StyleBrowserState {
     // Swift's normal didSet-doesn't-recurse rule. Here the backing storage
     // is @ObservationIgnored, so mutating `_amount` cannot re-enter the
     // setter regardless of what the macro generates.
-    @ObservationIgnored private var _amount: Double = 1.0
+    @ObservationIgnored private var _amount: Double = 0.5
     var amount: Double {
         get {
             access(keyPath: \.amount)
@@ -89,7 +89,7 @@ final class StyleBrowserState {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        let stored = defaults.object(forKey: Self.amountKey) as? Double ?? 1.0
+        let stored = defaults.object(forKey: Self.amountKey) as? Double ?? 0.5
         self._amount = min(max(stored, 0), 1)
         self.favorites = Set(defaults.stringArray(forKey: Self.favoritesKey) ?? [])
         self.recentStyleIDs = defaults.stringArray(forKey: Self.recentKey) ?? []
