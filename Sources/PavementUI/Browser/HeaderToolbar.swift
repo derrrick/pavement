@@ -10,7 +10,8 @@ struct HeaderToolbar: View {
     let hasSelection: Bool
     let canExport: Bool
     let document: PavementDocument?
-    let showingGrid: Binding<Bool>
+    let gridMode: Binding<GridOverlayMode>
+    let activeTool: Binding<CanvasTool>
     let onChooseFolder: () -> Void
     let onExport: () -> Void
     let onSaveStyle: () -> Void
@@ -152,27 +153,33 @@ struct HeaderToolbar: View {
         }
     }
 
-    // MARK: - Center cluster (canvas tools — placeholders for future canvas modes)
+    // MARK: - Center cluster (canvas tools)
 
     private var centerCluster: some View {
         HStack(spacing: 2) {
-            ToolbarIconButton(
+            ToolbarToolButton(
                 systemImage: "crop",
-                help: "Crop tool (use Crop panel for now)",
-                disabled: true,
-                action: {}
+                help: "Crop tool",
+                tool: .crop,
+                activeTool: activeTool,
+                disabled: document == nil,
+                action: {
+                    document?.recipe.operations.crop.enabled = true
+                }
             )
-            ToolbarIconButton(
+            ToolbarToolButton(
                 systemImage: "hand.draw",
                 help: "Move tool (canvas pan)",
-                disabled: true,
-                action: {}
+                tool: .pan,
+                activeTool: activeTool,
+                disabled: document == nil
             )
-            ToolbarIconButton(
+            ToolbarToolButton(
                 systemImage: "magnifyingglass",
-                help: "Zoom tool (use canvas scroll)",
-                disabled: true,
-                action: {}
+                help: "Zoom tool",
+                tool: .zoom,
+                activeTool: activeTool,
+                disabled: document == nil
             )
         }
     }
@@ -190,11 +197,29 @@ struct HeaderToolbar: View {
                 ),
                 disabled: document == nil
             )
-            ToolbarIconToggle(
-                systemImage: "grid",
-                help: "Rule-of-thirds grid overlay (G)",
-                isOn: showingGrid
-            )
+            Menu {
+                ForEach(GridOverlayMode.allCases) { mode in
+                    Button {
+                        gridMode.wrappedValue = mode
+                    } label: {
+                        Label(mode.label, systemImage: mode.systemImage)
+                    }
+                }
+            } label: {
+                Image(systemName: gridMode.wrappedValue.systemImage)
+                    .font(.system(size: 16, weight: gridMode.wrappedValue == .off ? .regular : .semibold))
+                    .frame(width: 32, height: 32)
+                    .foregroundStyle(gridMode.wrappedValue == .off ? Color.primary : Color.accentColor)
+                    .background(
+                        RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                            .fill(gridMode.wrappedValue == .off ? Color.clear : Color.accentColor.opacity(0.15))
+                    )
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .help("Composition guides (G cycles)")
+            .frame(width: 32, height: 32)
+            .hoverHighlight()
             verticalDivider
             ToolbarIconButton(
                 systemImage: "doc.on.clipboard",
@@ -226,19 +251,48 @@ struct HeaderToolbar: View {
     // MARK: - Auto
 
     private func runAuto() {
-        guard let document, let rendered = document.renderedImage else { return }
-        Task {
-            let stats = await Task.detached(priority: .userInitiated) {
-                ImageStatisticsCalculator.compute(from: rendered)
-            }.value
-            await MainActor.run {
-                let derived = AutoAdjust.operations(from: stats)
-                var ops = document.recipe.operations
-                ops.exposure = derived.exposure
-                ops.tone.contrast = derived.tone.contrast
-                ops.whiteBalance = derived.whiteBalance
-                document.recipe.operations = ops
-            }
+        guard let document else { return }
+        Task { @MainActor in
+            guard let stats = document.statisticsForMatching() else { return }
+            document.applyAutoAdjust(from: stats)
         }
+    }
+}
+
+private struct ToolbarToolButton: View {
+    let systemImage: String
+    let help: String
+    let tool: CanvasTool
+    let activeTool: Binding<CanvasTool>
+    var disabled = false
+    var action: () -> Void = {}
+
+    private var isActive: Bool { activeTool.wrappedValue == tool }
+
+    var body: some View {
+        Button {
+            if isActive, tool != .pan {
+                activeTool.wrappedValue = .pan
+            } else {
+                activeTool.wrappedValue = tool
+                action()
+            }
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 16, weight: isActive ? .semibold : .regular))
+                .frame(width: 32, height: 32)
+                .contentShape(Rectangle())
+                .foregroundStyle(isActive ? Color.accentColor : Color.primary)
+                .background(
+                    RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                        .fill(isActive ? Color.accentColor.opacity(0.16) : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.35 : 1.0)
+        .help(isActive && tool != .pan ? "\(help) - click again to return to pan" : help)
+        .hoverHighlight()
+        .cursorOnHover()
     }
 }

@@ -38,6 +38,20 @@ public enum MatchLook {
         ops.tone.contrast = Int(clamp(contrastDelta * strength,
                                       lower: -Double(maxContrastDelta),
                                       upper: Double(maxContrastDelta)))
+        let highlightDelta = Double(reference.p95L - current.p95L)
+        let shadowDelta = Double(reference.p5L - current.p5L)
+        ops.tone.highlights = Int(clamp(highlightDelta * 0.7 * strength,
+                                        lower: -40,
+                                        upper: 40))
+        ops.tone.shadows = Int(clamp(shadowDelta * 0.9 * strength,
+                                     lower: -45,
+                                     upper: 45))
+        if reference.p95L < current.p95L - 4 {
+            ops.tone.highlightRecovery = Int(clamp((current.p95L - reference.p95L) * 1.5 * Float(strength),
+                                                   lower: 0,
+                                                   upper: 45))
+        }
+        ops.toneCurve.rgb = toneCurve(forContrast: ops.tone.contrast, shadowLift: ops.tone.shadows)
 
         // 3. Saturation — match chroma magnitude ratio.
         let curChroma = max(0.5, Double(current.chromaMagnitude))
@@ -46,6 +60,9 @@ public enum MatchLook {
         ops.color.saturation = Int(clamp(satDelta * strength,
                                          lower: -Double(maxSaturationDelta),
                                          upper: Double(maxSaturationDelta)))
+        ops.color.vibrance = Int(clamp(satDelta * 0.45 * strength,
+                                       lower: -35,
+                                       upper: 35))
 
         // 4. White balance — a* drives tint, b* drives temperature.
         // Damp by content-similarity of L histograms (rough proxy via mean
@@ -73,10 +90,28 @@ public enum MatchLook {
                                           strength: strength) {
             ops.colorGrading.shadows = shadow
         }
+        if let midtone = wheelFromCentroid(a: reference.meanA, b: reference.meanB,
+                                           strength: strength * 0.55) {
+            ops.colorGrading.midtones = midtone
+        }
         if let highlight = wheelFromCentroid(a: reference.highlightA, b: reference.highlightB,
                                              strength: strength) {
             ops.colorGrading.highlights = highlight
         }
+        ops.colorGrading.blending = 65
+        ops.colorGrading.balance = Int(clamp(Double(reference.meanL - 50) * 0.6 * strength,
+                                             lower: -35,
+                                             upper: 35))
+
+        ops.hsl.orange.s = Int(clamp(Double(ops.color.saturation) * -0.25,
+                                     lower: -12,
+                                     upper: 6))
+        ops.hsl.orange.l = Int(clamp(Double(reference.meanL - current.meanL) * 0.12 * strength,
+                                     lower: -8,
+                                     upper: 8))
+        ops.hsl.green.s = Int(clamp(Double(ops.color.saturation) * -0.18,
+                                    lower: -18,
+                                    upper: 8))
 
         var temp = EditRecipe()
         temp.operations = ops
@@ -94,6 +129,17 @@ public enum MatchLook {
                             lower: 0,
                             upper: Double(maxGradeSaturation)))
         return GradingWheel(hue: Int(hueDeg.rounded()), sat: sat, lum: 0)
+    }
+
+    private static func toneCurve(forContrast contrast: Int, shadowLift: Int) -> [[Double]] {
+        let c = clamp(Double(contrast) / 100.0, lower: -0.6, upper: 0.6)
+        let lift = clamp(Double(shadowLift) / 100.0, lower: -0.25, upper: 0.25)
+        let black = clamp(0.015 + max(0, lift) * 0.10, lower: 0.0, upper: 0.06)
+        let shadowY = clamp(0.24 - c * 0.10 + lift * 0.20, lower: 0.08, upper: 0.38)
+        let midY = clamp(0.50 + lift * 0.04, lower: 0.44, upper: 0.56)
+        let highY = clamp(0.76 + c * 0.10, lower: 0.62, upper: 0.90)
+        let white = clamp(0.99 - max(0, -lift) * 0.04, lower: 0.94, upper: 1.0)
+        return [[0, black], [0.25, shadowY], [0.5, midY], [0.75, highY], [1, white]]
     }
 
     private static func clamp<T: Comparable>(_ value: T, lower: T, upper: T) -> T {

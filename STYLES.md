@@ -11,6 +11,8 @@ toolbar's `🪄 Style` menu.
 3. In the sheet:
    - Name + (optional) description.
    - Pick a category (User, B&W, Film, Cinematic, Color, Street).
+   - Set **Recommended Opacity** when the style should normally apply
+     below full strength.
    - Toggle **Exclude from style** for sections you don't want this
      style to overwrite when applied to other images. By default
      **Crop**, **Lens Correction**, and **White Balance** are excluded —
@@ -18,8 +20,11 @@ toolbar's `🪄 Style` menu.
 4. Hit **Save**. The style appears in the menu.
 
 When you apply a saved style, every non-excluded operation block is
-replaced and the modifiedAt timestamp bumps. Crop and lens correction
-survive unless you explicitly include them in the style.
+replaced after being scaled by the style's recommended opacity, and the
+modifiedAt timestamp bumps. This is parameter-level scaling, not
+before/after pixel blending, so curves, grain, HSL, and color grading
+fade toward their neutral values cleanly. Crop, lens correction, and
+white balance survive unless you explicitly include them in the style.
 
 ## Importing Lightroom presets (`.xmp`)
 
@@ -84,6 +89,7 @@ Styles are persisted as a single JSON array. Schema (per-style):
   "name": "Tokyo Noir",
   "category": "User",
   "description": "...",
+  "recommendedOpacity": 0.85,
   "operations": { /* same shape as EditRecipe.operations */ },
   "exclusions": ["crop", "lensCorrection", "whiteBalance"],
   "createdAt": "2026-04-25T12:00:00Z",

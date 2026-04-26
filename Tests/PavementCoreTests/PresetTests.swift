@@ -36,6 +36,29 @@ final class PresetTests: XCTestCase {
         XCTAssertFalse(recipe.operations.lensCorrection.enabled)
     }
 
+    func testApplyingPresetPreservesWhiteBalance() {
+        var recipe = EditRecipe()
+        recipe.operations.whiteBalance.mode = WhiteBalanceOp.custom
+        recipe.operations.whiteBalance.temp = 4300
+        recipe.operations.whiteBalance.tint = -12
+        recipe.apply(preset: BuiltinPresets.portraSkin)
+
+        XCTAssertEqual(recipe.operations.whiteBalance.mode, WhiteBalanceOp.custom)
+        XCTAssertEqual(recipe.operations.whiteBalance.temp, 4300)
+        XCTAssertEqual(recipe.operations.whiteBalance.tint, -12)
+    }
+
+    func testPresetAmountScalesParametersNotPixels() {
+        var recipe = EditRecipe()
+        recipe.apply(preset: BuiltinPresets.tokyoNeonNoir, amount: 0.5)
+
+        XCTAssertEqual(recipe.operations.tone.contrast, BuiltinPresets.tokyoNeonNoir.operations.tone.contrast / 2)
+        XCTAssertEqual(recipe.operations.colorGrading.shadows.hue, BuiltinPresets.tokyoNeonNoir.operations.colorGrading.shadows.hue)
+        XCTAssertEqual(recipe.operations.colorGrading.shadows.sat, BuiltinPresets.tokyoNeonNoir.operations.colorGrading.shadows.sat / 2)
+        XCTAssertLessThan(recipe.operations.grain.amount, BuiltinPresets.tokyoNeonNoir.operations.grain.amount)
+        XCTAssertNotEqual(recipe.operations.toneCurve.rgb, BuiltinPresets.tokyoNeonNoir.operations.toneCurve.rgb)
+    }
+
     func testBWPresetsDesaturate() {
         for preset in [BuiltinPresets.triXPush, BuiltinPresets.moriyama, BuiltinPresets.parisHenriSilver] {
             XCTAssertEqual(preset.operations.color.saturation, -100,

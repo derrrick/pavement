@@ -62,6 +62,43 @@ final class StyleTests: XCTestCase {
         XCTAssertEqual(recipe.lut?.name, "Test LUT")
     }
 
+    func testStyleRecommendedOpacityScalesWhenApplied() {
+        let style = Style(
+            name: "Half",
+            operations: makeOps {
+                $0.exposure.ev = 1.0
+                $0.tone.contrast = 40
+                $0.colorGrading.highlights.hue = 48
+                $0.colorGrading.highlights.sat = 20
+            },
+            recommendedOpacity: 0.5
+        )
+
+        var recipe = EditRecipe()
+        recipe.apply(style: style)
+
+        XCTAssertEqual(recipe.operations.exposure.ev, 0.5, accuracy: 0.001)
+        XCTAssertEqual(recipe.operations.tone.contrast, 20)
+        XCTAssertEqual(recipe.operations.colorGrading.highlights.hue, 48)
+        XCTAssertEqual(recipe.operations.colorGrading.highlights.sat, 10)
+    }
+
+    func testStyleDecodeDefaultsRecommendedOpacity() throws {
+        let json = """
+        {
+          "id": "legacy",
+          "name": "Legacy",
+          "category": "User",
+          "description": "",
+          "operations": {},
+          "exclusions": ["crop", "lensCorrection", "whiteBalance"],
+          "createdAt": "2026-04-26T12:00:00Z"
+        }
+        """
+        let style = try EditRecipe.makeDecoder().decode(Style.self, from: Data(json.utf8))
+        XCTAssertEqual(style.recommendedOpacity, 1.0)
+    }
+
     private func makeOps(_ mutate: (inout Operations) -> Void) -> Operations {
         var ops = Operations()
         mutate(&ops)

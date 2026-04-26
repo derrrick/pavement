@@ -4,16 +4,27 @@ import PavementCore
 public struct EditorView: View {
     let item: SourceItem?
     let cachedDecode: CachedDecode
-    let showGrid: Bool
+    let gridMode: GridOverlayMode
+    let activeTool: CanvasTool
+    let onDocumentChange: (PavementDocument?) -> Void
 
     @State private var document: PavementDocument?
     @State private var loadingURL: URL?
     @State private var errorMessage: String?
+    @State private var viewerState = ViewerState()
 
-    public init(item: SourceItem?, cachedDecode: CachedDecode, showGrid: Bool = false) {
+    public init(
+        item: SourceItem?,
+        cachedDecode: CachedDecode,
+        gridMode: GridOverlayMode = .off,
+        activeTool: CanvasTool = .pan,
+        onDocumentChange: @escaping (PavementDocument?) -> Void = { _ in }
+    ) {
         self.item = item
         self.cachedDecode = cachedDecode
-        self.showGrid = showGrid
+        self.gridMode = gridMode
+        self.activeTool = activeTool
+        self.onDocumentChange = onDocumentChange
     }
 
     public var body: some View {
@@ -46,7 +57,8 @@ public struct EditorView: View {
         } else if let document {
             HSplitView {
                 VStack(spacing: 0) {
-                    ImageCanvas(image: document.renderedImage)
+                    let canvasImage = activeTool == .crop ? document.cropCanvasImage : document.renderedImage
+                    ImageCanvas(image: canvasImage, viewerState: $viewerState, activeTool: activeTool)
                         .overlay(alignment: .topLeading) {
                             if document.showBefore {
                                 Text("BEFORE")
@@ -57,16 +69,48 @@ public struct EditorView: View {
                                     .padding(Theme.paddingDefault)
                             }
                         }
-                        .overlay { if showGrid { GridOverlay() } }
-                    DocumentStatusBar(document: document)
+                        .overlay {
+                            if activeTool == .crop {
+                                CropOverlay(
+                                    crop: Binding(
+                                        get: { document.recipe.operations.crop },
+                                        set: { document.recipe.operations.crop = $0 }
+                                    ),
+                                    viewerState: viewerState,
+                                    imageExtent: (document.cropCanvasImage ?? document.renderedImage)?.extent ?? .zero,
+                                    sourceAspectRatio: document.sourceAspectRatio
+                                )
+                            }
+                        }
+                        .overlay {
+                            // Crop has its own composition guides (rule-of-
+                            // thirds inside the crop rect) — the global
+                            // grid would double up and read as noise.
+                            // Toggle is preserved; it just doesn't render
+                            // while crop is the active tool.
+                            if gridMode != .off && activeTool != .crop {
+                                ImageGridOverlay(
+                                    mode: gridMode,
+                                    viewerState: viewerState,
+                                    imageExtent: canvasImage?.extent ?? .zero
+                                )
+                            }
+                        }
+                        .overlay(alignment: .topTrailing) {
+                            ViewerControls(state: $viewerState)
+                                .padding(Theme.paddingDefault)
+                        }
+                        .overlay(alignment: .bottomLeading) {
+                            CanvasToolHint(tool: activeTool, document: document)
+                                .padding(Theme.paddingDefault)
+                        }
+                    DocumentStatusBar(document: document, viewerState: viewerState)
                 }
                 .frame(minWidth: 480)
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                         HistogramView(histogram: document.histogram)
-                            .frame(height: 80)
-                            .background(Theme.surfaceInset)
-                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
+                            .frame(height: 126)
                         sections(for: document)
                     }
                     .padding(Theme.paddingDefault)
@@ -82,7 +126,7 @@ public struct EditorView: View {
     @ViewBuilder
     private func sections(for document: PavementDocument) -> some View {
         let ops = document.recipe.operations
-        CollapsibleSection(title: "Presets") {
+        CollapsibleSection(title: "Style Browser") {
             PresetsPanel(document: document)
         }
         CollapsibleSection(title: "Match Look", defaultExpanded: false) {
@@ -172,13 +216,16 @@ public struct EditorView: View {
         guard let item else {
             document = nil
             EditorViewDocumentRegistry.shared.current = nil
+            onDocumentChange(nil)
             return
         }
         if document?.source.id == item.id { return }
 
         loadingURL = item.url
         document = nil
+        viewerState = ViewerState()
         EditorViewDocumentRegistry.shared.current = nil
+        onDocumentChange(nil)
         errorMessage = nil
 
         do {
@@ -187,6 +234,7 @@ public struct EditorView: View {
                 document = loaded
                 document?.refreshRender()
                 EditorViewDocumentRegistry.shared.current = loaded
+                onDocumentChange(loaded)
             }
         } catch {
             if loadingURL == item.url {

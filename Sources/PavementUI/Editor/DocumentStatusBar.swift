@@ -5,10 +5,25 @@ import PavementCore
 /// Surfaces what professional editors put in their bottom info bar.
 struct DocumentStatusBar: View {
     let document: PavementDocument
+    let viewerState: ViewerState
 
     private var dimensionsText: String? {
-        guard let w = document.exif?.pixelWidth, let h = document.exif?.pixelHeight else { return nil }
+        if let w = document.exif?.pixelWidth, let h = document.exif?.pixelHeight {
+            return "\(w) × \(h)"
+        }
+        guard let image = document.renderedImage else { return nil }
+        let w = Int(image.extent.width.rounded())
+        let h = Int(image.extent.height.rounded())
+        guard w > 0, h > 0 else { return nil }
         return "\(w) × \(h)"
+    }
+
+    private var zoomModeText: String {
+        switch viewerState.zoomMode {
+        case .fit: return "Fit"
+        case .actualSize: return "100%"
+        case .custom: return "\(viewerState.zoomPercent)%"
+        }
     }
 
     private var captureSettings: String? {
@@ -48,6 +63,10 @@ struct DocumentStatusBar: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
             }
+
+            Label(zoomModeText, systemImage: "magnifyingglass")
+                .font(.caption.monospacedDigit().weight(.semibold))
+                .foregroundStyle(.secondary)
 
             if let isolation = document.previewIsolation {
                 Label(isolationLabel(for: isolation), systemImage: "circle.lefthalf.filled.righthalf.striped.horizontal")

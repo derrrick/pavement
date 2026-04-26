@@ -14,6 +14,12 @@ import Metal
 final class GrainProcessor: CIImageProcessorKernel {
 
     /// Mirrors GrainParams in GrainKernel.metal — keep field order in sync.
+    ///
+    /// `originX/Y` are populated per-tile inside `process(...)` from
+    /// `output.region.origin`. They give the kernel absolute image-extent
+    /// coordinates, which is what makes the noise look stable across
+    /// tiling AND makes the grain pattern stay locked to the image when
+    /// the canvas applies a zoom/pan transform downstream.
     struct Params {
         var amount: Float
         var granularity: Float
@@ -21,6 +27,8 @@ final class GrainProcessor: CIImageProcessorKernel {
         var falloff: Float
         var type: Int32
         var seed: UInt32
+        var originX: Float
+        var originY: Float
     }
 
     /// Lazy pipeline state. Compiles the kernel once at first use, caches
@@ -106,6 +114,13 @@ final class GrainProcessor: CIImageProcessorKernel {
             throw NSError(domain: "GrainProcessor", code: 3,
                           userInfo: [NSLocalizedDescriptionKey: "Could not create encoder"])
         }
+        // Stamp this tile's absolute origin into the params so the kernel
+        // computes noise in image-extent coordinates instead of tile-local
+        // gid. Without this: tile boundaries showed seams AND the grain
+        // pattern detached from the image when the canvas scaled it.
+        params.originX = Float(output.region.minX)
+        params.originY = Float(output.region.minY)
+
         encoder.setComputePipelineState(pipeline)
         encoder.setTexture(inTex,  index: 0)
         encoder.setTexture(outTex, index: 1)

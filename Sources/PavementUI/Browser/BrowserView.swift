@@ -11,8 +11,10 @@ public struct BrowserView: View {
     @State private var showingSaveStyle = false
     @State private var showingManageStyles = false
     @State private var importErrorMessage: String?
-    @State private var showingGrid = false
+    @State private var gridMode: GridOverlayMode = .off
+    @State private var activeTool: CanvasTool = .pan
     @State private var cachedDecode = CachedDecode()
+    @State private var currentDocument: PavementDocument?
 
     private let columnsLayout: [GridItem] = [
         GridItem(.adaptive(minimum: 140, maximum: 220), spacing: 12)
@@ -26,8 +28,9 @@ public struct BrowserView: View {
                 folderURL: folderURL,
                 hasSelection: !selection.selection.isEmpty,
                 canExport: !itemsToExport.isEmpty,
-                document: documentForCurrentSelection,
-                showingGrid: $showingGrid,
+                document: currentDocument,
+                gridMode: $gridMode,
+                activeTool: $activeTool,
                 onChooseFolder: { chooseFolder() },
                 onExport: { showingExport = true },
                 onSaveStyle: { showingSaveStyle = true },
@@ -48,11 +51,7 @@ public struct BrowserView: View {
                 ProgressView("Scanning folder…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if selection.items.isEmpty {
-                ContentUnavailableView(
-                    "No images",
-                    systemImage: "photo.on.rectangle.angled",
-                    description: Text("Folder contained no RAF, CR3, DNG, or JPEG files.")
-                )
+                NoImagesView(onChooseFolder: chooseFolder)
             } else {
                 HSplitView {
                     contactSheet
@@ -60,7 +59,9 @@ public struct BrowserView: View {
                     EditorView(
                         item: selectedSingleItem,
                         cachedDecode: cachedDecode,
-                        showGrid: showingGrid
+                        gridMode: gridMode,
+                        activeTool: activeTool,
+                        onDocumentChange: { currentDocument = $0 }
                     )
                     .frame(minWidth: 600)
                 }
@@ -85,15 +86,15 @@ public struct BrowserView: View {
             return .handled
         }
         .onKeyPress("\\") {
-            documentForCurrentSelection?.showBefore.toggle()
+            currentDocument?.showBefore.toggle()
             return .handled
         }
         .onKeyPress(.escape) {
-            documentForCurrentSelection?.previewIsolation = nil
+            currentDocument?.previewIsolation = nil
             return .handled
         }
         .onKeyPress("g") {
-            showingGrid.toggle()
+            gridMode = gridMode.next()
             return .handled
         }
         .onKeyPress(characters: CharacterSet(charactersIn: "012345"), phases: .down) { press in
@@ -180,12 +181,11 @@ public struct BrowserView: View {
     }
 
     private var emptyState: some View {
-        ContentUnavailableView(
-            "Pick a folder",
-            systemImage: "folder.badge.plus",
-            description: Text("Choose a folder containing RAFs, CR3s, DNGs, or JPEGs to start.")
+        PremiumLandingView(
+            onChooseFolder: chooseFolder,
+            onImportXMP: chooseXMP,
+            onImportLUT: chooseLUT
         )
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func errorView(_ message: String) -> some View {
@@ -250,9 +250,7 @@ public struct BrowserView: View {
     /// hook through a binding so shortcuts at the BrowserView level can
     /// reach in. For now we let the EditorView publish its document via
     /// a shared environment value so this stays local.
-    private var documentForCurrentSelection: PavementDocument? {
-        EditorViewDocumentRegistry.shared.current
-    }
+    private var documentForCurrentSelection: PavementDocument? { currentDocument }
 
     private func updateColumnCount(for width: CGFloat) {
         // Mirror the columnsLayout adaptive math so up/down arrow keys jump
@@ -342,6 +340,7 @@ public struct BrowserView: View {
         folderURL = folder
         errorMessage = nil
         isLoading = true
+        currentDocument = nil
         cachedDecode.clear()
 
         Task.detached(priority: .userInitiated) {

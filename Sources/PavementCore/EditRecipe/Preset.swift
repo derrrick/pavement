@@ -5,14 +5,48 @@ public struct Preset: Identifiable, Equatable {
     public let name: String
     public let category: String
     public let description: String
+    public let recommendedAmount: Double
     public let operations: Operations
 
-    public init(id: String, name: String, category: String, description: String = "", operations: Operations) {
+    public init(
+        id: String,
+        name: String,
+        category: String,
+        description: String = "",
+        recommendedAmount: Double? = nil,
+        operations: Operations
+    ) {
         self.id = id
         self.name = name
         self.category = category
         self.description = description
+        self.recommendedAmount = recommendedAmount ?? Self.recommendedAmount(for: operations, category: category)
         self.operations = operations
+    }
+
+    private static func recommendedAmount(for operations: Operations, category: String) -> Double {
+        if category == "Reset" || category == "B&W" || operations.color.saturation <= -95 {
+            return 1.0
+        }
+
+        let toneWeight = abs(operations.tone.contrast)
+            + abs(operations.tone.highlights) / 2
+            + abs(operations.tone.shadows) / 2
+            + abs(operations.tone.whites) / 2
+            + abs(operations.tone.blacks) / 2
+        let colorWeight = abs(operations.color.saturation)
+            + abs(operations.color.vibrance) / 2
+            + operations.colorGrading.shadows.sat
+            + operations.colorGrading.midtones.sat
+            + operations.colorGrading.highlights.sat
+        let weight = Double(toneWeight + colorWeight + operations.grain.amount / 2)
+
+        switch weight {
+        case 0..<70: return 0.95
+        case 70..<115: return 0.88
+        case 115..<165: return 0.80
+        default: return 0.72
+        }
     }
 }
 
@@ -1778,18 +1812,91 @@ public enum BuiltinPresets {
     private static func build(_ mutate: (inout Operations) -> Void) -> Operations {
         var ops = Operations()
         mutate(&ops)
+        return premiumTuned(ops)
+    }
+
+    private static func premiumTuned(_ source: Operations) -> Operations {
+        var ops = source
+
+        if ops.tone.highlightRecovery == 0 && (ops.tone.highlights < 0 || ops.tone.whites > 0) {
+            let recovery = 10 + abs(ops.tone.highlights) / 3 + max(0, ops.tone.whites) / 4
+            ops.tone.highlightRecovery = min(35, recovery)
+        }
+
+        if ops.toneCurve.rgb == ToneCurveOp.identity {
+            ops.toneCurve.rgb = tunedToneCurve(for: ops)
+        }
+
+        if ops.color.saturation > 25 {
+            ops.color.saturation = 25
+            ops.color.vibrance = min(35, ops.color.vibrance + 8)
+        }
+
+        if ops.color.saturation > -95 {
+            ops.hsl.orange.s = min(ops.hsl.orange.s, 14)
+            ops.hsl.orange.l = max(ops.hsl.orange.l, 3)
+            ops.hsl.red.s = min(ops.hsl.red.s, 24)
+            ops.hsl.green.s = min(ops.hsl.green.s, 20)
+            ops.hsl.aqua.s = min(ops.hsl.aqua.s, 26)
+            ops.hsl.blue.s = min(ops.hsl.blue.s, 28)
+        }
+
+        if ops.grain.amount > 0 {
+            if ops.grain.type == GrainOp.typeFine {
+                ops.grain.type = grainType(for: ops)
+            }
+            ops.grain.size = max(12, min(ops.grain.size, ops.grain.amount >= 35 ? 34 : 26))
+            ops.grain.roughness = max(38, min(ops.grain.roughness, ops.grain.amount >= 45 ? 72 : 58))
+        }
+
+        ops.detail.sharpAmount = min(ops.detail.sharpAmount, 55)
+        ops.detail.sharpMasking = max(ops.detail.sharpMasking, ops.grain.amount > 20 ? 18 : 8)
+
         return ops
+    }
+
+    private static func tunedToneCurve(for ops: Operations) -> [[Double]] {
+        let isBW = ops.color.saturation <= -95 || ops.bw.enabled
+        let highContrast = ops.tone.contrast >= 28 || ops.tone.blacks <= -25
+        let lifted = ops.tone.contrast < 0 || ops.tone.blacks > 0
+
+        if isBW && highContrast {
+            return [[0, 0.006], [0.18, 0.10], [0.52, 0.54], [0.84, 0.91], [1, 0.995]]
+        } else if isBW {
+            return [[0, 0.02], [0.24, 0.21], [0.55, 0.56], [0.86, 0.88], [1, 0.99]]
+        } else if highContrast {
+            return [[0, 0.012], [0.22, 0.17], [0.50, 0.51], [0.78, 0.84], [1, 0.985]]
+        } else if lifted {
+            return [[0, 0.04], [0.22, 0.21], [0.55, 0.56], [0.86, 0.88], [1, 0.985]]
+        } else {
+            return [[0, 0.012], [0.25, 0.23], [0.50, 0.505], [0.76, 0.80], [1, 0.99]]
+        }
+    }
+
+    private static func grainType(for ops: Operations) -> String {
+        if ops.grain.amount >= 65 { return GrainOp.typeHarsh }
+        if ops.color.saturation <= -95 { return GrainOp.typeSilverRich }
+        if ops.tone.contrast < 0 { return GrainOp.typeSoft }
+        return GrainOp.typeCubic
     }
 }
 
 extension EditRecipe {
     /// Apply a preset by replacing every operation EXCEPT crop and lens
-    /// correction (those are per-image and shouldn't be overwritten by a
+    /// correction / white balance (those are per-image and shouldn't be overwritten by a
     /// look you bought from someone else's preset).
     public mutating func apply(preset: Preset) {
-        var ops = preset.operations
+        apply(preset: preset, amount: 1.0)
+    }
+
+    /// Apply a preset at parameter level. This is intentionally not
+    /// pixel-blending: each operation is interpolated toward its neutral
+    /// value, which keeps reduced-strength presets crisp and photographic.
+    public mutating func apply(preset: Preset, amount: Double) {
+        var ops = preset.operations.scaled(by: amount)
         ops.crop = operations.crop
         ops.lensCorrection = operations.lensCorrection
+        ops.whiteBalance = operations.whiteBalance
         operations = ops
         modifiedAt = EditRecipe.now()
     }

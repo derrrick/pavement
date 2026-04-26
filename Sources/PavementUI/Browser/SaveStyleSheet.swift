@@ -10,6 +10,7 @@ struct SaveStyleSheet: View {
     @State private var description: String = ""
     @State private var category: String = "User"
     @State private var exclusions: Set<OperationKind> = Style.defaultExclusions
+    @State private var recommendedOpacity: Double = 1.0
 
     private let categoryChoices = ["User", "B&W", "Film", "Cinematic", "Color", "Street"]
 
@@ -28,6 +29,15 @@ struct SaveStyleSheet: View {
                 TextField("Description", text: $description)
                     .textFieldStyle(.roundedBorder)
                     .frame(width: 320)
+                HStack {
+                    Text("Recommended Opacity")
+                    Slider(value: $recommendedOpacity, in: 0...1)
+                        .frame(width: 180)
+                    Text("\(Int((recommendedOpacity * 100).rounded()))")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, alignment: .trailing)
+                }
             }
 
             Divider()
@@ -72,6 +82,7 @@ struct SaveStyleSheet: View {
             description: description,
             operations: recipe.operations,
             exclusions: exclusions,
+            recommendedOpacity: recommendedOpacity,
             lut: recipe.lut
         )
         UserStylesStore.shared.add(style)

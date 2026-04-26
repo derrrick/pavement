@@ -14,16 +14,29 @@ struct ToneCurvePanel: View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Spacer()
-                Menu("Preset") {
-                    Button("Identity") { setCurve([[0, 0], [1, 1]]) }
-                    Button("Subtle S") { setCurve([[0, 0], [0.25, 0.18], [0.75, 0.82], [1, 1]]) }
-                    Button("Heavy S") { setCurve([[0, 0], [0.25, 0.10], [0.75, 0.90], [1, 1]]) }
-                    Button("Lift Shadows") { setCurve([[0, 0.05], [0.5, 0.55], [1, 1]]) }
-                    Button("Crush Blacks") { setCurve([[0, 0], [0.15, 0.0], [1, 1]]) }
+                Menu {
+                    ForEach(ToneCurvePreset.groups, id: \.name) { group in
+                        Section(group.name) {
+                            ForEach(group.presets) { preset in
+                                Button {
+                                    setCurve(preset.points)
+                                } label: {
+                                    VStack(alignment: .leading) {
+                                        Text(preset.name)
+                                        Text(preset.description)
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } label: {
+                    Label("Preset", systemImage: "chart.xyaxis.line")
                 }
                 .menuStyle(.borderlessButton)
                 .font(.caption)
-                .frame(width: 80)
+                .frame(width: 98)
             }
 
             GeometryReader { geo in
@@ -194,4 +207,87 @@ struct ToneCurvePanel: View {
         let y = max(0, min(1, Double(1 - canvasPoint.y / max(1, size.height))))
         return [x, y]
     }
+}
+
+private struct ToneCurvePreset: Identifiable {
+    let id = UUID()
+    let name: String
+    let description: String
+    let points: [[Double]]
+
+    struct Group {
+        let name: String
+        let presets: [ToneCurvePreset]
+    }
+
+    static let groups: [Group] = [
+        Group(name: "Clean", presets: [
+            ToneCurvePreset(
+                name: "Linear",
+                description: "No curve adjustment.",
+                points: [[0, 0], [1, 1]]
+            ),
+            ToneCurvePreset(
+                name: "Soft Contrast",
+                description: "Gentle editorial snap without hard clipping.",
+                points: [[0, 0.01], [0.22, 0.19], [0.50, 0.50], [0.78, 0.82], [1, 0.99]]
+            ),
+            ToneCurvePreset(
+                name: "Studio Crisp",
+                description: "Clean product contrast with protected whites.",
+                points: [[0, 0.004], [0.18, 0.13], [0.48, 0.49], [0.76, 0.84], [0.94, 0.97], [1, 1]]
+            )
+        ]),
+        Group(name: "Film", presets: [
+            ToneCurvePreset(
+                name: "Soft Matte",
+                description: "Lifted blacks and rolled highlights.",
+                points: [[0, 0.055], [0.18, 0.17], [0.50, 0.51], [0.82, 0.84], [1, 0.965]]
+            ),
+            ToneCurvePreset(
+                name: "Print Film",
+                description: "Low toe, creamy midtones, gentle shoulder.",
+                points: [[0, 0.018], [0.14, 0.09], [0.40, 0.39], [0.70, 0.76], [0.93, 0.94], [1, 0.985]]
+            ),
+            ToneCurvePreset(
+                name: "Portra Roll-Off",
+                description: "Open shadows with smooth highlight compression.",
+                points: [[0, 0.025], [0.22, 0.22], [0.52, 0.54], [0.78, 0.82], [0.95, 0.94], [1, 0.975]]
+            )
+        ]),
+        Group(name: "Mood", presets: [
+            ToneCurvePreset(
+                name: "Cinematic S",
+                description: "Richer shadows and stronger highlight shape.",
+                points: [[0, 0.006], [0.20, 0.12], [0.48, 0.48], [0.76, 0.86], [1, 0.995]]
+            ),
+            ToneCurvePreset(
+                name: "Deep Blacks",
+                description: "Anchored black point with bright upper mids.",
+                points: [[0, 0], [0.12, 0.025], [0.32, 0.25], [0.68, 0.73], [0.90, 0.95], [1, 1]]
+            ),
+            ToneCurvePreset(
+                name: "Night Hold",
+                description: "Protects neon highlights while keeping depth.",
+                points: [[0, 0.006], [0.24, 0.16], [0.56, 0.57], [0.82, 0.84], [1, 0.965]]
+            )
+        ]),
+        Group(name: "Recovery", presets: [
+            ToneCurvePreset(
+                name: "Open Shadows",
+                description: "Lifts dark tones without flattening the top end.",
+                points: [[0, 0.04], [0.18, 0.24], [0.50, 0.54], [0.82, 0.86], [1, 0.99]]
+            ),
+            ToneCurvePreset(
+                name: "Highlight Tame",
+                description: "Compresses bright values for harsh daylight.",
+                points: [[0, 0.006], [0.28, 0.26], [0.58, 0.60], [0.84, 0.84], [1, 0.94]]
+            ),
+            ToneCurvePreset(
+                name: "Airy Portrait",
+                description: "Light shadows, clear mids, soft whites.",
+                points: [[0, 0.035], [0.24, 0.28], [0.52, 0.56], [0.82, 0.86], [1, 0.975]]
+            )
+        ])
+    ]
 }

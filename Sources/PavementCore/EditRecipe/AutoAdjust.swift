@@ -17,6 +17,10 @@ public enum AutoAdjust {
         let targetSpread = 90.0
         let contrastShift = (targetSpread / curSpread - 1) * 50
         ops.tone.contrast = Int(max(-50, min(50, contrastShift)))
+        if stats.p95L > 92 {
+            ops.tone.highlightRecovery = min(45, Int((stats.p95L - 92) * 5))
+            ops.tone.highlights = -min(35, Int((stats.p95L - 92) * 4))
+        }
 
         // Gray-world WB: a*/b* mean → temperature/tint shift, opposite sign.
         if abs(stats.meanA) > 2 || abs(stats.meanB) > 2 {

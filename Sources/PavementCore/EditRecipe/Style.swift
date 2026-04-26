@@ -11,6 +11,7 @@ public struct Style: Identifiable, Codable, Equatable {
     public var description: String
     public var operations: Operations
     public var exclusions: Set<OperationKind>
+    public var recommendedOpacity: Double
     public var createdAt: Date
     /// Optional 3D LUT applied as a final pass after operations. Lets
     /// imported .cube LUTs ride alongside parametric adjustments in a
@@ -24,6 +25,7 @@ public struct Style: Identifiable, Codable, Equatable {
         description: String = "",
         operations: Operations,
         exclusions: Set<OperationKind> = Style.defaultExclusions,
+        recommendedOpacity: Double = 1.0,
         createdAt: Date = EditRecipe.now(),
         lut: LUTData? = nil
     ) {
@@ -33,8 +35,43 @@ public struct Style: Identifiable, Codable, Equatable {
         self.description = description
         self.operations = operations
         self.exclusions = exclusions
+        self.recommendedOpacity = Clamping.clamp(recommendedOpacity, to: 0.0...1.0)
         self.createdAt = createdAt
         self.lut = lut
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, category, description, operations, exclusions
+        case recommendedOpacity, createdAt, lut
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(String.self, forKey: .id)
+        self.name = try c.decode(String.self, forKey: .name)
+        self.category = (try? c.decodeIfPresent(String.self, forKey: .category)) ?? "User"
+        self.description = (try? c.decodeIfPresent(String.self, forKey: .description)) ?? ""
+        self.operations = try c.decode(Operations.self, forKey: .operations)
+        self.exclusions = (try? c.decodeIfPresent(Set<OperationKind>.self, forKey: .exclusions)) ?? Style.defaultExclusions
+        let opacity = (try? c.decodeIfPresent(Double.self, forKey: .recommendedOpacity)) ?? 1.0
+        self.recommendedOpacity = Clamping.clamp(opacity, to: 0.0...1.0)
+        self.createdAt = (try? c.decodeIfPresent(Date.self, forKey: .createdAt)) ?? EditRecipe.now()
+        self.lut = try? c.decodeIfPresent(LUTData.self, forKey: .lut)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(category, forKey: .category)
+        try c.encode(description, forKey: .description)
+        try c.encode(operations, forKey: .operations)
+        try c.encode(exclusions, forKey: .exclusions)
+        try c.encode(recommendedOpacity, forKey: .recommendedOpacity)
+        try c.encode(createdAt, forKey: .createdAt)
+        if let lut {
+            try c.encode(lut, forKey: .lut)
+        }
     }
 
     /// Field-level exclusions a brand-new style applies by default. Crop,
@@ -101,22 +138,30 @@ extension EditRecipe {
     /// per-image properties survive. Modifies modifiedAt so the sidecar
     /// autosave fires.
     public mutating func apply(style: Style) {
+        apply(style: style, amount: style.recommendedOpacity)
+    }
+
+    /// Apply a style as an editable recipe stack at the style's requested
+    /// intensity. LUT-only styles keep their LUT at full strength because
+    /// the current renderer has no LUT opacity stage yet.
+    public mutating func apply(style: Style, amount: Double) {
+        let scaled = style.operations.scaled(by: amount)
         var ops = operations
 
-        if !style.exclusions.contains(.exposure)     { ops.exposure     = style.operations.exposure }
-        if !style.exclusions.contains(.tone)         { ops.tone         = style.operations.tone }
-        if !style.exclusions.contains(.toneCurve)    { ops.toneCurve    = style.operations.toneCurve }
-        if !style.exclusions.contains(.color)        { ops.color        = style.operations.color }
-        if !style.exclusions.contains(.hsl)          { ops.hsl          = style.operations.hsl }
-        if !style.exclusions.contains(.colorGrading) { ops.colorGrading = style.operations.colorGrading }
-        if !style.exclusions.contains(.bw)           { ops.bw           = style.operations.bw }
-        if !style.exclusions.contains(.detail)       { ops.detail       = style.operations.detail }
-        if !style.exclusions.contains(.grain)        { ops.grain        = style.operations.grain }
-        if !style.exclusions.contains(.vignette)     { ops.vignette     = style.operations.vignette }
+        if !style.exclusions.contains(.exposure)     { ops.exposure     = scaled.exposure }
+        if !style.exclusions.contains(.tone)         { ops.tone         = scaled.tone }
+        if !style.exclusions.contains(.toneCurve)    { ops.toneCurve    = scaled.toneCurve }
+        if !style.exclusions.contains(.color)        { ops.color        = scaled.color }
+        if !style.exclusions.contains(.hsl)          { ops.hsl          = scaled.hsl }
+        if !style.exclusions.contains(.colorGrading) { ops.colorGrading = scaled.colorGrading }
+        if !style.exclusions.contains(.bw)           { ops.bw           = scaled.bw }
+        if !style.exclusions.contains(.detail)       { ops.detail       = scaled.detail }
+        if !style.exclusions.contains(.grain)        { ops.grain        = scaled.grain }
+        if !style.exclusions.contains(.vignette)     { ops.vignette     = scaled.vignette }
 
-        if !style.exclusions.contains(.crop)           { ops.crop           = style.operations.crop }
-        if !style.exclusions.contains(.lensCorrection) { ops.lensCorrection = style.operations.lensCorrection }
-        if !style.exclusions.contains(.whiteBalance)   { ops.whiteBalance   = style.operations.whiteBalance }
+        if !style.exclusions.contains(.crop)           { ops.crop           = scaled.crop }
+        if !style.exclusions.contains(.lensCorrection) { ops.lensCorrection = scaled.lensCorrection }
+        if !style.exclusions.contains(.whiteBalance)   { ops.whiteBalance   = scaled.whiteBalance }
 
         operations = ops
         lut = style.lut

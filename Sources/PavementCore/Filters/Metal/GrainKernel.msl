@@ -31,6 +31,14 @@ struct GrainParams {
     float falloff;      // bell width (2.0 = our standard 4l(1-l) bell)
     int32_t type;       // 0..5
     uint32_t seed;      // per-image seed
+    // Absolute image-extent origin of the current tile's output region.
+    // Set in GrainProcessor.process() per-dispatch — lets the kernel
+    // compute noise position in image-extent space rather than tile-local
+    // thread coords. Critical for two reasons: (1) seamless across tiles,
+    // (2) the grain pattern stays welded to image pixels when the canvas
+    // applies a downstream zoom/pan transform.
+    float originX;
+    float originY;
 };
 
 // ------------------------------------------------------------
@@ -154,8 +162,12 @@ kernel void grainKernel(
     // colorimetry pass, it's a visibility weighting).
     float luma = dot(c.rgb, float3(0.2126f, 0.7152f, 0.0722f));
 
-    // Per-type noise primitive.
-    float2 pos = float2(gid);
+    // Absolute image-extent coordinate. Adding the tile's region origin
+    // means tile (0,0) of one batch and tile (512,0) of the next compute
+    // continuous noise — no seams. It also keeps the noise locked to a
+    // fixed image-pixel grid, so a downstream canvas scale moves the
+    // grain together with the image content (as Capture One does).
+    float2 pos = float2(gid) + float2(p.originX, p.originY);
     float n;
     switch (p.type) {
         case 0:  n = fineNoise(pos,       p.granularity, p.seed); break;

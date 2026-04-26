@@ -12,6 +12,7 @@ struct MatchLookPanel: View {
     @State private var isAnalyzing = false
     @State private var intensity: Double = 1.0
     @State private var dropTargeted = false
+    @State private var statusMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -37,6 +38,12 @@ struct MatchLookPanel: View {
                     .buttonStyle(.borderless)
                     .font(.caption)
                 }
+            }
+
+            if let statusMessage {
+                Text(statusMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
             }
 
             Text("Drop a reference JPEG to derive a recipe of edits that pulls this image's color and tone toward the reference. Crop and lens correction are preserved.")
@@ -84,11 +91,12 @@ struct MatchLookPanel: View {
 
     private func handleDrop(providers: [NSItemProvider]) -> Bool {
         guard let provider = providers.first else { return false }
-
         let identifiers = provider.registeredTypeIdentifiers
-        if identifiers.contains(UTType.fileURL.identifier) {
-            _ = provider.loadObject(ofClass: URL.self) { url, _ in
-                guard let url else { return }
+
+        if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            provider.loadDataRepresentation(forTypeIdentifier: UTType.fileURL.identifier) { data, _ in
+                guard let data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil) else { return }
                 Task { @MainActor in
                     await loadReference(from: url)
                 }
@@ -108,53 +116,51 @@ struct MatchLookPanel: View {
     }
 
     private func loadReference(from url: URL) async {
-        guard let image = NSImage(contentsOf: url) else { return }
-        await analyze(image: image)
+        guard let image = NSImage(contentsOf: url) else {
+            statusMessage = "Couldn't open that reference image."
+            return
+        }
+        await analyze(image: image, url: url)
     }
 
-    private func analyze(image: NSImage) async {
+    private func analyze(image: NSImage, url: URL? = nil) async {
         referenceImage = image
+        referenceStats = nil
+        statusMessage = nil
         isAnalyzing = true
         let stats = await Task.detached(priority: .userInitiated) {
-            guard let tiff = image.tiffRepresentation,
-                  let ci = CIImage(data: tiff) else { return nil as ImageStatistics? }
+            let ci: CIImage?
+            if let url {
+                ci = CIImage(contentsOf: url)
+            } else {
+                ci = Self.makeCIImage(from: image)
+            }
+            guard let ci else { return nil as ImageStatistics? }
             return ImageStatisticsCalculator.compute(from: ci)
         }.value
         referenceStats = stats
+        statusMessage = stats == nil ? "Couldn't analyze that reference image." : "Reference analyzed."
         isAnalyzing = false
     }
 
     private func applyMatch() {
-        guard let refStats = referenceStats,
-              let renderedSource = document.renderedImage ?? document.cachedSourceForMatching else {
+        guard let refStats = referenceStats else {
+            statusMessage = "Drop a reference image first."
             return
         }
-        Task {
-            let currentStats = await Task.detached(priority: .userInitiated) {
-                ImageStatisticsCalculator.compute(from: renderedSource)
-            }.value
-            let derived = MatchLook.deriveOperations(
-                from: refStats,
-                current: currentStats,
-                intensity: intensity
-            )
-            // Replace operation blocks the match drives; preserve crop + lens.
-            await MainActor.run {
-                var newOps = derived
-                newOps.crop = document.recipe.operations.crop
-                newOps.lensCorrection = document.recipe.operations.lensCorrection
-                document.recipe.operations = newOps
-            }
+        guard document.statisticsForMatching() != nil else {
+            statusMessage = "Current image is still loading."
+            return
         }
+        document.applyMatchedLook(reference: refStats, intensity: intensity)
+        statusMessage = "Matched look applied."
     }
-}
 
-extension PavementDocument {
-    /// Convenience: if no rendered image is available yet, return any
-    /// cached decode for the source URL so MatchLook still has something
-    /// to compute statistics from.
-    @MainActor
-    var cachedSourceForMatching: CIImage? {
-        renderedImage
+    nonisolated private static func makeCIImage(from image: NSImage) -> CIImage? {
+        var rect = CGRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(forProposedRect: &rect, context: nil, hints: nil) else {
+            return nil
+        }
+        return CIImage(cgImage: cgImage)
     }
 }

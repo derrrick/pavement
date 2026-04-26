@@ -39,7 +39,11 @@ public struct GrainFilter {
             roughness: roughnessScaled,
             falloff: falloff,
             type: typeIndex,
-            seed: seed
+            seed: seed,
+            // originX/Y are stamped per-dispatch from output.region.origin
+            // in GrainProcessor.process — the values here are unused.
+            originX: 0,
+            originY: 0
         )
         return GrainProcessor.apply(image: image, params: params)
     }

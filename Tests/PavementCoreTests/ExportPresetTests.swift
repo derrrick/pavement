@@ -4,7 +4,7 @@ import XCTest
 final class ExportPresetTests: XCTestCase {
     func testInstagramSpec() {
         let spec = ExportPreset.instagram.spec
-        XCTAssertEqual(spec.name, "Instagram")
+        XCTAssertEqual(spec.name, "Instagram (Portrait)")
         XCTAssertEqual(spec.format, .jpeg)
         XCTAssertEqual(spec.longEdge, 1350)
         XCTAssertEqual(spec.colorSpace, .sRGB)
@@ -18,7 +18,7 @@ final class ExportPresetTests: XCTestCase {
         let spec = ExportPreset.web.spec
         XCTAssertEqual(spec.format, .jpeg)
         XCTAssertEqual(spec.longEdge, 2048)
-        XCTAssertEqual(spec.quality, 0.8, accuracy: 0.001)
+        XCTAssertEqual(spec.quality, 0.85, accuracy: 0.001)
     }
 
     func testPrintSpecIsTiff16P3() {

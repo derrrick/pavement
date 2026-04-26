@@ -1,4 +1,7 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// Single source of truth for the app's visual design tokens.
 ///
@@ -83,4 +86,36 @@ public extension View {
     ) -> some View {
         modifier(HoverHighlight(cornerRadius: cornerRadius, tint: tint))
     }
+
+    #if os(macOS)
+    func cursorOnHover(_ cursor: NSCursor = .pointingHand) -> some View {
+        modifier(CursorOnHover(cursor: cursor))
+    }
+    #endif
 }
+
+#if os(macOS)
+private struct CursorOnHover: ViewModifier {
+    let cursor: NSCursor
+    @State private var pushed = false
+
+    func body(content: Content) -> some View {
+        content
+            .onHover { inside in
+                if inside, !pushed {
+                    cursor.push()
+                    pushed = true
+                } else if !inside, pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+            .onDisappear {
+                if pushed {
+                    NSCursor.pop()
+                    pushed = false
+                }
+            }
+    }
+}
+#endif

@@ -8,10 +8,12 @@ import PavementCore
 /// without spinning a constant 60Hz draw loop.
 struct ImageCanvas: NSViewRepresentable {
     let image: CIImage?
+    @Binding var viewerState: ViewerState
+    let activeTool: CanvasTool
 
-    func makeNSView(context: Context) -> MTKView {
+    func makeNSView(context: Context) -> CanvasMTKView {
         let device = MTLCreateSystemDefaultDevice() ?? PipelineContext.shared.device!
-        let view = MTKView(frame: .zero, device: device)
+        let view = CanvasMTKView(frame: .zero, device: device)
         view.colorPixelFormat = .rgba16Float
         view.framebufferOnly = false
         view.enableSetNeedsDisplay = true
@@ -35,8 +37,13 @@ struct ImageCanvas: NSViewRepresentable {
         return view
     }
 
-    func updateNSView(_ view: MTKView, context: Context) {
+    func updateNSView(_ view: CanvasMTKView, context: Context) {
         context.coordinator.image = image
+        context.coordinator.viewerState = $viewerState
+        context.coordinator.activeTool = activeTool
+        view.interactionDelegate = context.coordinator
+        view.activeTool = activeTool
+        context.coordinator.syncViewerState(for: view)
         // If the user dragged the window between displays of different
         // gamuts, refresh the layer colorspace. Cheap.
         if let metalLayer = view.layer as? CAMetalLayer {
@@ -48,15 +55,28 @@ struct ImageCanvas: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     @MainActor
-    final class Coordinator: NSObject, MTKViewDelegate {
+    final class Coordinator: NSObject, MTKViewDelegate, CanvasInteractionDelegate {
         var image: CIImage?
         var commandQueue: MTLCommandQueue?
+        var viewerState: Binding<ViewerState>?
+        var activeTool: CanvasTool = .pan
         private let backgroundColor = CIColor(red: 0.05, green: 0.05, blue: 0.05)
 
-        nonisolated func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+        nonisolated func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {
+            MainActor.assumeIsolated {
+                guard let canvas = view as? CanvasMTKView else { return }
+                syncViewerState(for: canvas)
+            }
+        }
 
         nonisolated func draw(in view: MTKView) {
             MainActor.assumeIsolated { drawOnMain(in: view) }
+        }
+
+        func syncViewerState(for view: CanvasMTKView) {
+            guard var state = viewerState?.wrappedValue else { return }
+            state.updateImage(extent: image?.extent, viewport: view.drawableSize)
+            viewerState?.wrappedValue = state
         }
 
         private func drawOnMain(in view: MTKView) {
@@ -75,12 +95,14 @@ struct ImageCanvas: NSViewRepresentable {
                image.extent.width.isFinite, image.extent.height.isFinite,
                image.extent.width > 0, image.extent.height > 0 {
                 let extent = image.extent
-                let scale = min(drawableSize.width / extent.width,
-                                drawableSize.height / extent.height)
+                let state = viewerState?.wrappedValue ?? ViewerState()
+                let scale = state.scale.isFinite && state.scale > 0
+                    ? state.scale
+                    : ViewerState.fitScale(imageSize: extent.size, viewport: drawableSize)
                 let scaled = image.transformed(by: CGAffineTransform(scaleX: scale, y: scale))
                 let scaledExtent = scaled.extent
-                let dx = (drawableSize.width - scaledExtent.width) / 2 - scaledExtent.minX
-                let dy = (drawableSize.height - scaledExtent.height) / 2 - scaledExtent.minY
+                let dx = (drawableSize.width - scaledExtent.width) / 2 - scaledExtent.minX + state.panOffset.width
+                let dy = (drawableSize.height - scaledExtent.height) / 2 - scaledExtent.minY + state.panOffset.height
                 let centered = scaled.transformed(by: CGAffineTransform(translationX: dx, y: dy))
                 composite = centered.composited(over: bg)
             } else {
@@ -98,5 +120,150 @@ struct ImageCanvas: NSViewRepresentable {
             buffer.present(drawable)
             buffer.commit()
         }
+
+        func canvasDidDoubleClick(_ view: CanvasMTKView) {
+            guard var state = viewerState?.wrappedValue else { return }
+            state.toggleFitActual()
+            viewerState?.wrappedValue = state
+            view.setNeedsDisplay(view.bounds)
+        }
+
+        func canvas(_ view: CanvasMTKView, didScroll event: NSEvent) {
+            guard var state = viewerState?.wrappedValue else { return }
+            let precise = event.hasPreciseScrollingDeltas
+            let delta = precise ? event.scrollingDeltaY : event.deltaY * 8
+            guard delta != 0 else { return }
+            let factor = pow(1.0025, delta)
+            state.zoom(by: factor, anchor: drawablePoint(for: event.locationInWindow, in: view))
+            viewerState?.wrappedValue = state
+            view.setNeedsDisplay(view.bounds)
+        }
+
+        func canvas(_ view: CanvasMTKView, didMagnify event: NSEvent) {
+            guard var state = viewerState?.wrappedValue else { return }
+            state.zoom(by: 1 + event.magnification, anchor: drawablePoint(for: event.locationInWindow, in: view))
+            viewerState?.wrappedValue = state
+            view.setNeedsDisplay(view.bounds)
+        }
+
+        func canvas(_ view: CanvasMTKView, didDrag delta: CGSize) {
+            guard activeTool == .pan || activeTool == .crop else { return }
+            guard var state = viewerState?.wrappedValue else { return }
+            let scaleX = view.bounds.width > 0 ? view.drawableSize.width / view.bounds.width : 1
+            let scaleY = view.bounds.height > 0 ? view.drawableSize.height / view.bounds.height : 1
+            state.pan(by: CGSize(width: delta.width * scaleX, height: delta.height * scaleY))
+            viewerState?.wrappedValue = state
+            view.setNeedsDisplay(view.bounds)
+        }
+
+        func canvas(_ view: CanvasMTKView, didClick event: NSEvent) {
+            guard activeTool == .zoom, event.clickCount == 1 else { return }
+            // Zoom in. Option-click also zooms out for keyboard parity.
+            zoom(in: !event.modifierFlags.contains(.option), event: event, view: view)
+        }
+
+        func canvas(_ view: CanvasMTKView, didRightClick event: NSEvent) {
+            guard activeTool == .zoom else { return }
+            // Capture-One convention — left=in, right=out — so the user
+            // never has to reach for a modifier key while bracketing zoom.
+            zoom(in: false, event: event, view: view)
+        }
+
+        private func zoom(in zoomingIn: Bool, event: NSEvent, view: CanvasMTKView) {
+            guard var state = viewerState?.wrappedValue else { return }
+            let factor: CGFloat = zoomingIn ? 1.25 : 0.8
+            state.zoom(by: factor, anchor: drawablePoint(for: event.locationInWindow, in: view))
+            viewerState?.wrappedValue = state
+            view.setNeedsDisplay(view.bounds)
+        }
+
+        private func drawablePoint(for windowPoint: CGPoint, in view: CanvasMTKView) -> CGPoint {
+            let local = view.convert(windowPoint, from: nil)
+            let scaleX = view.bounds.width > 0 ? view.drawableSize.width / view.bounds.width : 1
+            let scaleY = view.bounds.height > 0 ? view.drawableSize.height / view.bounds.height : 1
+            return CGPoint(x: local.x * scaleX, y: local.y * scaleY)
+        }
+    }
+}
+
+@MainActor
+protocol CanvasInteractionDelegate: AnyObject {
+    func canvasDidDoubleClick(_ view: CanvasMTKView)
+    func canvas(_ view: CanvasMTKView, didClick event: NSEvent)
+    func canvas(_ view: CanvasMTKView, didRightClick event: NSEvent)
+    func canvas(_ view: CanvasMTKView, didScroll event: NSEvent)
+    func canvas(_ view: CanvasMTKView, didMagnify event: NSEvent)
+    func canvas(_ view: CanvasMTKView, didDrag delta: CGSize)
+}
+
+@MainActor
+final class CanvasMTKView: MTKView {
+    weak var interactionDelegate: CanvasInteractionDelegate?
+    var activeTool: CanvasTool = .pan {
+        didSet { updateCursor() }
+    }
+    private var lastDragLocation: CGPoint?
+
+    override var acceptsFirstResponder: Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.makeFirstResponder(self)
+        lastDragLocation = convert(event.locationInWindow, from: nil)
+        if event.clickCount == 2 {
+            interactionDelegate?.canvasDidDoubleClick(self)
+        } else {
+            interactionDelegate?.canvas(self, didClick: event)
+        }
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        let location = convert(event.locationInWindow, from: nil)
+        if let lastDragLocation {
+            interactionDelegate?.canvas(
+                self,
+                didDrag: CGSize(width: location.x - lastDragLocation.x, height: location.y - lastDragLocation.y)
+            )
+        }
+        lastDragLocation = location
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        lastDragLocation = nil
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        // When the zoom tool is active, intercept right-click so the
+        // system context menu doesn't appear and the click reaches the
+        // delegate as a zoom-out signal. For other tools we let the
+        // default behaviour through.
+        if activeTool == .zoom {
+            window?.makeFirstResponder(self)
+            interactionDelegate?.canvas(self, didRightClick: event)
+        } else {
+            super.rightMouseDown(with: event)
+        }
+    }
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        // Suppress the context menu while zoom is active so right-click
+        // can be repurposed for zoom-out.
+        activeTool == .zoom ? nil : super.menu(for: event)
+    }
+
+    override func resetCursorRects() {
+        addCursorRect(bounds, cursor: activeTool.cursor)
+    }
+
+    private func updateCursor() {
+        window?.invalidateCursorRects(for: self)
+        activeTool.cursor.set()
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        interactionDelegate?.canvas(self, didScroll: event)
+    }
+
+    override func magnify(with event: NSEvent) {
+        interactionDelegate?.canvas(self, didMagnify: event)
     }
 }
