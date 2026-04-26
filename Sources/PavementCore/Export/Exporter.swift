@@ -21,14 +21,19 @@ public struct Exporter {
     /// Render `recipe` against `source` and write the result to `destination`
     /// using `preset`. Decode goes through `cachedDecode` if provided so a UI
     /// caller doesn't pay a fresh demosaic per export.
+    ///
+    /// `specOverride` lets the CLI pass a one-off `ExportSpec` (built from
+    /// `--long-edge` / `--quality` flags) without polluting the preset enum.
+    /// When non-nil, it wins over `preset.spec`.
     public func export(
         recipe: EditRecipe,
         source: URL,
         preset: ExportPreset,
         destination: URL,
-        cachedDecode: CachedDecode? = nil
+        cachedDecode: CachedDecode? = nil,
+        specOverride: ExportSpec? = nil
     ) throws {
-        let spec = preset.spec
+        let spec = specOverride ?? preset.spec
         let lensCorrection = recipe.operations.lensCorrection.enabled
 
         // 1. Decode

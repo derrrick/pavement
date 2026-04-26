@@ -19,11 +19,29 @@ struct ImageCanvas: NSViewRepresentable {
         view.clearColor = MTLClearColor(red: 0.05, green: 0.05, blue: 0.05, alpha: 1)
         view.delegate = context.coordinator
         context.coordinator.commandQueue = device.makeCommandQueue()
+
+        // Tell WindowServer the float values landing in this drawable are
+        // Display-P3-encoded. Without this, the layer is treated as sRGB
+        // and on-screen color drifts compared to a P3-tagged JPEG export
+        // (the exact bug PLAN.md §10 risk #3 warned about). `colorspace`
+        // lives on CAMetalLayer specifically — generic CALayer doesn't
+        // have it.
+        view.wantsLayer = true
+        if let metalLayer = view.layer as? CAMetalLayer {
+            metalLayer.colorspace = ColorSpaces.displayP3
+            metalLayer.wantsExtendedDynamicRangeContent = true
+            metalLayer.pixelFormat = .rgba16Float
+        }
         return view
     }
 
     func updateNSView(_ view: MTKView, context: Context) {
         context.coordinator.image = image
+        // If the user dragged the window between displays of different
+        // gamuts, refresh the layer colorspace. Cheap.
+        if let metalLayer = view.layer as? CAMetalLayer {
+            metalLayer.colorspace = ColorSpaces.displayP3
+        }
         view.setNeedsDisplay(view.bounds)
     }
 

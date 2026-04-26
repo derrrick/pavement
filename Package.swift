@@ -28,7 +28,12 @@ let package = Package(
             name: "PavementCore",
             path: "Sources/PavementCore",
             resources: [
-                .process("Filters/Metal")
+                // .msl extension (not .metal) so Xcode/SwiftPM don't try
+                // to invoke the Metal compiler on it. We compile the
+                // source at runtime via MTLDevice.makeLibrary(source:).
+                // This avoids requiring the optional Metal Toolchain
+                // Xcode component to be installed.
+                .copy("Filters/Metal/GrainKernel.msl")
             ]
         ),
         .target(

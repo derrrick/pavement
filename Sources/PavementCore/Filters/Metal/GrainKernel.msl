@@ -1,0 +1,187 @@
+#include <metal_stdlib>
+using namespace metal;
+
+// ============================================================
+// Grain Kernel — Capture-One-style procedural film grain
+// ============================================================
+//
+// Single-pass compute kernel: for each output pixel, sample the
+// input, compute luminance, generate type-specific noise from a
+// deterministic hash of (x, y, seed), apply a luminance bell mask
+// (real grain peaks in midtones, dies at clipped extremes), add
+// signed noise to the input, write output.
+//
+// Six types differ at the math level — not just blur radius:
+//
+//   0 = Fine        per-pixel PCG3D hash, uniform
+//   1 = Cubic       hash on coarsened grid + smoothstep (T-MAX cubes)
+//   2 = Tabular     anisotropic 3:1 stretched cells (platelets)
+//   3 = Silver Rich fBm — 3 octaves of value noise (clumping)
+//   4 = Soft        bilinear-interpolated coarse value noise
+//   5 = Harsh       per-pixel hash + extreme contrast curve
+//
+// Memory cost: ZERO. The shader runs at output resolution with no
+// pre-allocated buffers — every value is computed from the hash on
+// the fly. A 100MP file uses the same memory as a 1MP preview.
+
+struct GrainParams {
+    float amount;       // 0..1 — overall noise contribution
+    float granularity;  // pixel-units per noise cell (size slider)
+    float roughness;    // 0..1 — contrast / bite of the noise
+    float falloff;      // bell width (2.0 = our standard 4l(1-l) bell)
+    int32_t type;       // 0..5
+    uint32_t seed;      // per-image seed
+};
+
+// ------------------------------------------------------------
+// PCG3D — high-quality 3D integer hash, period 2^96+
+// http://www.jcgt.org/published/0009/03/02/  (Mark Jarzynski)
+// Returns three independent uint outputs from a uvec3 input.
+// ------------------------------------------------------------
+inline uint3 pcg3d(uint3 v) {
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    v ^= v >> 16u;
+    v.x += v.y * v.z;
+    v.y += v.z * v.x;
+    v.z += v.x * v.y;
+    return v;
+}
+
+inline float hash01(int x, int y, uint seed) {
+    uint3 h = pcg3d(uint3(uint(x), uint(y), seed));
+    return float(h.x) * (1.0f / 4294967295.0f);
+}
+
+// ------------------------------------------------------------
+// Type 0: Fine — per-pixel hash with optional cell coarsening
+// ------------------------------------------------------------
+inline float fineNoise(float2 pos, float granularity, uint seed) {
+    int2 cell = int2(floor(pos / granularity));
+    return hash01(cell.x, cell.y, seed);
+}
+
+// ------------------------------------------------------------
+// Type 1: Cubic (T-MAX) — sharp distribution via smoothstep
+// ------------------------------------------------------------
+inline float cubicNoise(float2 pos, float granularity, uint seed) {
+    int2 cell = int2(floor(pos / granularity));
+    float n = hash01(cell.x, cell.y, seed);
+    return smoothstep(0.30f, 0.70f, n);
+}
+
+// ------------------------------------------------------------
+// Type 2: Tabular — anisotropic cells, 3:1 stretched horizontally
+// reads as flat platelet crystals.
+// ------------------------------------------------------------
+inline float tabularNoise(float2 pos, float granularity, uint seed) {
+    float2 stretch = float2(granularity * 3.0f, granularity);
+    int2 cell = int2(floor(pos / stretch));
+    return hash01(cell.x, cell.y, seed);
+}
+
+// ------------------------------------------------------------
+// Helper: bilinear value noise (used by Soft + Silver Rich)
+// ------------------------------------------------------------
+inline float valueNoise(float2 pos, float granularity, uint seed) {
+    float2 p = pos / granularity;
+    float2 fl = floor(p);
+    float2 f = p - fl;
+    f = f * f * (3.0f - 2.0f * f);  // smoothstep interpolation
+    int x0 = int(fl.x), y0 = int(fl.y);
+    float v00 = hash01(x0,     y0,     seed);
+    float v10 = hash01(x0 + 1, y0,     seed);
+    float v01 = hash01(x0,     y0 + 1, seed);
+    float v11 = hash01(x0 + 1, y0 + 1, seed);
+    return mix(mix(v00, v10, f.x), mix(v01, v11, f.x), f.y);
+}
+
+// ------------------------------------------------------------
+// Type 3: Silver Rich — fBm (multi-octave value noise)
+// 3 octaves at 1×/2×/4× frequency, amplitudes 0.5/0.25/0.125,
+// renormalized so output is still in 0..1.
+// Produces natural clumping without the geometric cell artifacts
+// that Voronoi gives.
+// ------------------------------------------------------------
+inline float silverRichNoise(float2 pos, float granularity, uint seed) {
+    float v = 0.0f;
+    float amp = 0.5f;
+    float freqGran = granularity;
+    for (int i = 0; i < 3; i++) {
+        v += valueNoise(pos, freqGran, seed + uint(i) * 0x9E3779B9u) * amp;
+        freqGran *= 0.5f;
+        amp *= 0.5f;
+    }
+    return v / (0.5f + 0.25f + 0.125f);   // normalize → 0..1
+}
+
+// ------------------------------------------------------------
+// Type 4: Soft — bilinear value noise, no octaves. Gentle gradients.
+// ------------------------------------------------------------
+inline float softNoise(float2 pos, float granularity, uint seed) {
+    return valueNoise(pos, granularity, seed);
+}
+
+// ------------------------------------------------------------
+// Type 5: Harsh — per-pixel hash with extreme contrast push.
+// pow(n, 0.4) skews the distribution + roughness will amplify
+// further upstream so it reads as gritty pushed-film clumps.
+// ------------------------------------------------------------
+inline float harshNoise(float2 pos, float granularity, uint seed) {
+    int2 cell = int2(floor(pos / max(granularity, 1.0f)));
+    float n = hash01(cell.x, cell.y, seed);
+    return pow(n, 0.4f);
+}
+
+// ------------------------------------------------------------
+// Main kernel
+// ------------------------------------------------------------
+kernel void grainKernel(
+    texture2d<float, access::read>  inTex   [[texture(0)]],
+    texture2d<float, access::write> outTex  [[texture(1)]],
+    constant GrainParams &p                 [[buffer(0)]],
+    uint2 gid                               [[thread_position_in_grid]]
+) {
+    if (gid.x >= outTex.get_width() || gid.y >= outTex.get_height()) {
+        return;
+    }
+    float4 c = inTex.read(gid);
+
+    // Rec.709 luminance (working space is Display P3 but the linear-light
+    // luma weights are close enough for the bell mask; this isn't a
+    // colorimetry pass, it's a visibility weighting).
+    float luma = dot(c.rgb, float3(0.2126f, 0.7152f, 0.0722f));
+
+    // Per-type noise primitive.
+    float2 pos = float2(gid);
+    float n;
+    switch (p.type) {
+        case 0:  n = fineNoise(pos,       p.granularity, p.seed); break;
+        case 1:  n = cubicNoise(pos,      p.granularity, p.seed); break;
+        case 2:  n = tabularNoise(pos,    p.granularity, p.seed); break;
+        case 3:  n = silverRichNoise(pos, p.granularity, p.seed); break;
+        case 4:  n = softNoise(pos,       p.granularity, p.seed); break;
+        case 5:  n = harshNoise(pos,      p.granularity, p.seed); break;
+        default: n = 0.5f; break;
+    }
+
+    // Sign + roughness contrast. Roughness 0 → flat; 1 → ±1 amplitude.
+    float signedN = (n - 0.5f) * 2.0f;
+    // Optional contrast push for Harsh — pow on signed value preserving sign.
+    if (p.type == 5) {
+        float s = sign(signedN);
+        signedN = s * pow(abs(signedN), 1.0f - 0.5f * p.roughness);
+    }
+    signedN *= p.roughness;
+
+    // Luma bell mask: 1 - |2L - 1|^falloff. Falloff = 2 → 4L(1-L).
+    // Higher falloff → wider bell (grain reaches further into shadows/highlights).
+    float bell = 1.0f - pow(abs(luma * 2.0f - 1.0f), p.falloff);
+    bell = clamp(bell, 0.0f, 1.0f);
+
+    // Composite: amount scales final contribution.
+    float3 result = c.rgb + signedN * p.amount * bell;
+    outTex.write(float4(result, c.a), gid);
+}

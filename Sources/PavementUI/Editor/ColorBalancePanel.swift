@@ -199,9 +199,14 @@ struct ColorWheelView: View {
     private func positionDot(center: CGPoint, dotRadius: CGFloat) -> some View {
         let saturation = max(0, min(1, Double(wheel.sat) / 100.0))
         let r = dotRadius * CGFloat(saturation)
+        // SwiftUI AngularGradient sweeps clockwise in screen space starting
+        // at 3 o'clock. Match that here: hue increases clockwise from right,
+        // which means y uses the screen direction (down = positive), NOT
+        // math convention. Without this, the dot landed where the painted
+        // ring showed a different color (clicked-blue → got-green).
         let theta = Double(wheel.hue) * .pi / 180
         let x = center.x + r * CGFloat(cos(theta))
-        let y = center.y - r * CGFloat(sin(theta))
+        let y = center.y + r * CGFloat(sin(theta))
         return ZStack {
             Circle()
                 .fill(Color.white)
@@ -221,7 +226,10 @@ struct ColorWheelView: View {
                 let center = CGPoint(x: size.width / 2, y: size.height / 2)
                 let radius = min(size.width, size.height) / 2 - 20
                 let dx = value.location.x - center.x
-                let dy = center.y - value.location.y // SwiftUI Y is flipped
+                // Use screen-Y direction (down is positive) so the computed
+                // hue matches the clockwise-painted ring. Inverting Y here
+                // would put the math in a different rotation than the ring.
+                let dy = value.location.y - center.y
                 let r = sqrt(dx * dx + dy * dy)
                 let normR = min(1, r / radius)
 

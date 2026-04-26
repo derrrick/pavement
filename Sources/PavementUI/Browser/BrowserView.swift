@@ -38,9 +38,7 @@ public struct BrowserView: View {
                     documentForCurrentSelection?.recipe.apply(style: style)
                 }
             )
-            Divider()
             secondaryStatusBar
-            Divider()
 
             if let errorMessage {
                 errorView(errorMessage)
@@ -163,8 +161,12 @@ public struct BrowserView: View {
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Theme.paddingDefault)
+        .frame(height: Theme.statusBarHeight)
+        .background(Theme.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Theme.dividerColor).frame(height: 1)
+        }
     }
 
     /// Items destined for the export sheet. If the user has ticked any
@@ -206,7 +208,7 @@ public struct BrowserView: View {
     private var contactSheet: some View {
         GeometryReader { geometry in
             ScrollView {
-                LazyVGrid(columns: columnsLayout, spacing: 12) {
+                LazyVGrid(columns: columnsLayout, spacing: Theme.paddingDefault) {
                     ForEach(Array(selection.items.enumerated()), id: \.element.id) { index, item in
                         ThumbnailCell(
                             item: item,
@@ -226,8 +228,9 @@ public struct BrowserView: View {
                         )
                     }
                 }
-                .padding(12)
+                .padding(Theme.paddingDefault)
             }
+            .background(Theme.surface)
             .onAppear { updateColumnCount(for: geometry.size.width) }
             .onChange(of: geometry.size.width) { _, newWidth in
                 updateColumnCount(for: newWidth)

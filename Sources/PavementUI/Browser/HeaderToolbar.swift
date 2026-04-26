@@ -23,31 +23,41 @@ struct HeaderToolbar: View {
     @ObservedObject private var clipboard = RecipeClipboard.shared
 
     var body: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 6) {
             leftCluster
-            Divider().frame(height: 18)
+            verticalDivider
             actionsCluster
             Spacer()
             centerCluster
             Spacer()
             viewCluster
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.bar)
+        .padding(.horizontal, Theme.paddingDefault)
+        .frame(height: Theme.toolbarHeight)
+        .background(Theme.surface)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Theme.dividerColor)
+                .frame(height: 1)
+        }
+    }
+
+    private var verticalDivider: some View {
+        Rectangle()
+            .fill(Theme.borderSubtle)
+            .frame(width: 1, height: 22)
+            .padding(.horizontal, 4)
     }
 
     // MARK: - Left cluster (Import / Style / Export)
 
     private var leftCluster: some View {
-        HStack(spacing: 4) {
-            Button(action: onChooseFolder) {
-                Label("Import", systemImage: "folder.badge.plus")
-                    .labelStyle(.iconOnly)
-            }
-            .help(folderURL?.path ?? "Choose folder…")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
+        HStack(spacing: 2) {
+            ToolbarIconButton(
+                systemImage: "folder.badge.plus",
+                help: folderURL?.path ?? "Choose folder…",
+                action: onChooseFolder
+            )
 
             Menu {
                 Button {
@@ -89,23 +99,22 @@ struct HeaderToolbar: View {
 
                 Button("Manage Styles…") { onManageStyles() }
             } label: {
-                Label("Style", systemImage: "wand.and.stars")
-                    .labelStyle(.iconOnly)
+                Image(systemName: "wand.and.stars")
+                    .font(.system(size: 16, weight: .regular))
+                    .frame(width: 32, height: 32)
             }
+            .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .help("Save / Import / Manage Styles")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-            .frame(width: 32)
+            .frame(width: 32, height: 32)
+            .hoverHighlight()
 
-            Button(action: onExport) {
-                Label("Export", systemImage: "square.and.arrow.up")
-                    .labelStyle(.iconOnly)
-            }
-            .disabled(!canExport)
-            .help("Export selected (⌘E)")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
+            ToolbarIconButton(
+                systemImage: "square.and.arrow.up",
+                help: "Export selected (⌘E)",
+                disabled: !canExport,
+                action: onExport
+            )
             .keyboardShortcut("e", modifiers: [.command])
         }
     }
@@ -113,142 +122,103 @@ struct HeaderToolbar: View {
     // MARK: - Actions cluster (Reset / Undo / Redo / Auto)
 
     private var actionsCluster: some View {
-        HStack(spacing: 4) {
-            Button {
-                document?.resetAdjustments()
-            } label: {
-                Label("Reset", systemImage: "arrow.counterclockwise")
-                    .labelStyle(.iconOnly)
-            }
-            .disabled(document == nil)
-            .help("Reset all adjustments (preserves crop)")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-
-            Button {
-                document?.undo()
-            } label: {
-                Label("Undo", systemImage: "arrow.uturn.backward")
-                    .labelStyle(.iconOnly)
-            }
-            .disabled(document?.canUndo != true)
-            .help("Undo (⌘Z)")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
+        HStack(spacing: 2) {
+            ToolbarIconButton(
+                systemImage: "arrow.counterclockwise",
+                help: "Reset all adjustments (preserves crop)",
+                disabled: document == nil,
+                action: { document?.resetAdjustments() }
+            )
+            ToolbarIconButton(
+                systemImage: "arrow.uturn.backward",
+                help: "Undo (⌘Z)",
+                disabled: document?.canUndo != true,
+                action: { document?.undo() }
+            )
             .keyboardShortcut("z", modifiers: [.command])
-
-            Button {
-                document?.redo()
-            } label: {
-                Label("Redo", systemImage: "arrow.uturn.forward")
-                    .labelStyle(.iconOnly)
-            }
-            .disabled(document?.canRedo != true)
-            .help("Redo (⇧⌘Z)")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
+            ToolbarIconButton(
+                systemImage: "arrow.uturn.forward",
+                help: "Redo (⇧⌘Z)",
+                disabled: document?.canRedo != true,
+                action: { document?.redo() }
+            )
             .keyboardShortcut("z", modifiers: [.command, .shift])
-
-            Button {
-                runAuto()
-            } label: {
-                Label("Auto", systemImage: "wand.and.rays")
-                    .labelStyle(.iconOnly)
-            }
-            .disabled(document?.renderedImage == nil)
-            .help("Auto-adjust exposure / contrast / WB")
-            .buttonStyle(.borderless)
-            .controlSize(.large)
+            ToolbarIconButton(
+                systemImage: "wand.and.rays",
+                help: "Auto-adjust exposure / contrast / WB",
+                disabled: document?.renderedImage == nil,
+                action: { runAuto() }
+            )
         }
     }
 
     // MARK: - Center cluster (canvas tools — placeholders for future canvas modes)
 
     private var centerCluster: some View {
-        HStack(spacing: 4) {
-            // These mode toggles will drive future canvas-tool implementations.
-            // For v1 they're inert chrome that documents the intent.
-            Button {} label: {
-                Label("Crop", systemImage: "crop")
-                    .labelStyle(.iconOnly)
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-            .disabled(true)
-            .help("Crop tool (use Crop panel for now)")
-
-            Button {} label: {
-                Label("Move", systemImage: "hand.draw")
-                    .labelStyle(.iconOnly)
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-            .disabled(true)
-            .help("Move tool (canvas pan)")
-
-            Button {} label: {
-                Label("Zoom", systemImage: "magnifyingglass")
-                    .labelStyle(.iconOnly)
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-            .disabled(true)
-            .help("Zoom tool (use canvas scroll)")
+        HStack(spacing: 2) {
+            ToolbarIconButton(
+                systemImage: "crop",
+                help: "Crop tool (use Crop panel for now)",
+                disabled: true,
+                action: {}
+            )
+            ToolbarIconButton(
+                systemImage: "hand.draw",
+                help: "Move tool (canvas pan)",
+                disabled: true,
+                action: {}
+            )
+            ToolbarIconButton(
+                systemImage: "magnifyingglass",
+                help: "Zoom tool (use canvas scroll)",
+                disabled: true,
+                action: {}
+            )
         }
     }
 
     // MARK: - View cluster (Before/After / Grid / Copy / Paste)
 
     private var viewCluster: some View {
-        HStack(spacing: 4) {
-            Toggle(isOn: Binding(
-                get: { document?.showBefore ?? false },
-                set: { document?.showBefore = $0 }
-            )) {
-                Label("Before/After", systemImage: "rectangle.split.2x1")
-                    .labelStyle(.iconOnly)
-            }
-            .toggleStyle(.button)
-            .controlSize(.large)
-            .disabled(document == nil)
-            .help("Before / After (\\)")
-
-            Toggle(isOn: showingGrid) {
-                Label("Grid", systemImage: "grid")
-                    .labelStyle(.iconOnly)
-            }
-            .toggleStyle(.button)
-            .controlSize(.large)
-            .help("Rule-of-thirds grid overlay (G)")
-
-            Button {
-                if let document {
-                    RecipeClipboard.shared.copy(from: document.recipe)
+        HStack(spacing: 2) {
+            ToolbarIconToggle(
+                systemImage: "rectangle.split.2x1",
+                help: "Before / After (\\)",
+                isOn: Binding(
+                    get: { document?.showBefore ?? false },
+                    set: { document?.showBefore = $0 }
+                ),
+                disabled: document == nil
+            )
+            ToolbarIconToggle(
+                systemImage: "grid",
+                help: "Rule-of-thirds grid overlay (G)",
+                isOn: showingGrid
+            )
+            verticalDivider
+            ToolbarIconButton(
+                systemImage: "doc.on.clipboard",
+                help: "Copy current adjustments (⇧⌘C)",
+                disabled: document == nil,
+                action: {
+                    if let document {
+                        RecipeClipboard.shared.copy(from: document.recipe)
+                    }
                 }
-            } label: {
-                Label("Copy Settings", systemImage: "doc.on.clipboard")
-                    .labelStyle(.iconOnly)
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-            .disabled(document == nil)
-            .help("Copy current adjustments (⌘C)")
+            )
             .keyboardShortcut("c", modifiers: [.command, .shift])
-
-            Button {
-                if let document, let _ = clipboard.snapshot {
-                    var r = document.recipe
-                    RecipeClipboard.shared.paste(into: &r)
-                    document.recipe = r
+            ToolbarIconButton(
+                systemImage: "doc.on.doc",
+                help: "Apply copied adjustments (⇧⌘V)",
+                disabled: document == nil || !clipboard.hasContent,
+                action: {
+                    if let document, clipboard.snapshot != nil {
+                        var r = document.recipe
+                        RecipeClipboard.shared.paste(into: &r)
+                        document.recipe = r
+                    }
                 }
-            } label: {
-                Label("Apply Settings", systemImage: "doc.on.doc")
-                    .labelStyle(.iconOnly)
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.large)
-            .disabled(document == nil || !clipboard.hasContent)
-            .help("Apply copied adjustments (⇧⌘V)")
+            )
             .keyboardShortcut("v", modifiers: [.command, .shift])
         }
     }

@@ -32,44 +32,64 @@ struct CollapsibleSection<Content: View>: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 0) {
             header
             if expanded {
                 content()
+                    .padding(.horizontal, 10)
+                    .padding(.top, 4)
+                    .padding(.bottom, 12)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        .background(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .fill(Theme.surfaceRaised.opacity(expanded ? 0.45 : 0))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
+                .stroke(expanded ? Theme.borderSubtle : Color.clear, lineWidth: 1)
+        )
+        .animation(.easeOut(duration: 0.14), value: expanded)
     }
 
     private var header: some View {
         HStack(spacing: 6) {
             Button {
-                withAnimation(.easeInOut(duration: 0.16)) { expanded.toggle() }
+                withAnimation(.easeInOut(duration: 0.18)) { expanded.toggle() }
                 UserDefaults.standard.set(expanded, forKey: storageKey)
             } label: {
-                HStack(spacing: 6) {
+                HStack(spacing: 8) {
                     Image(systemName: "chevron.right")
                         .rotationEffect(.degrees(expanded ? 90 : 0))
-                        .font(.caption.weight(.bold))
+                        .font(.caption2.weight(.bold))
                         .foregroundStyle(.tertiary)
-                    Text(title).font(.headline)
+                        .frame(width: 10)
+                    Text(title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(expanded ? Color.primary : Color.primary.opacity(0.85))
                     if isModified {
-                        Circle().fill(Color.accentColor).frame(width: 6, height: 6)
+                        Circle()
+                            .fill(Color.accentColor)
+                            .frame(width: 6, height: 6)
                             .help("Modified")
                     }
+                    Spacer(minLength: 0)
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-
-            Spacer()
 
             if let onReset, isModified {
                 Button("Reset", action: onReset)
                     .buttonStyle(.borderless)
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                    .padding(.trailing, 4)
             }
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .hoverHighlight(cornerRadius: Theme.cornerRadius, tint: Theme.hoverTint.opacity(0.6))
     }
 }

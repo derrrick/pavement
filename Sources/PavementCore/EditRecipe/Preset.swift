@@ -16,29 +16,39 @@ public struct Preset: Identifiable, Equatable {
     }
 }
 
-/// 16 curated presets covering iconic street-photography looks. Numeric
-/// values come from research on Lightroom/Capture One conventions for
-/// Cinestill/Portra/Velvia/Tri-X-style emulations and contemporary
-/// digital looks. Each preset preserves the user's crop and lens
+/// 72 curated presets across 6 categories (B&W, Film, Cinematic, Color,
+/// Street, Landscape) — 12 per category. Numeric values come from
+/// research on Lightroom/Capture One conventions for film-stock and
+/// look emulation. Each preset preserves the user's crop and lens
 /// correction when applied (see EditRecipe.apply(preset:)).
 public enum BuiltinPresets {
     public static let all: [Preset] = [
         neutral,
-        // B&W
+        // B&W (12)
         triXPush, moriyama, vivianMaier, parisHenriSilver, ericKimGrit,
-        // Film
+        anselZone, highKeyBW, lowKeyBW, platinumPalladium,
+        documentaryReportage, architectureBW, classicWeddingBW,
+        // Film (12)
         tungstenNights, portraSkin, velviaSaturate, cinestill50D, kodakGold,
         kodakEktar, fujiProvia100F, fujiSuperia400, kodachrome64, agfaVista400,
-        // Cinematic
+        portra160, fujiPro400H,
+        // Cinematic (12)
         lomochromePurple, tokyoNeonNoir,
         wesAnderson, fincherDesat, bladeRunner2049, driveNeon, furyRoad,
         jokerSicko, hongKongNeon, deakinsGold,
-        // Color
-        polaroid600,
-        sunsetGlow, popArt, crossProcess, fadedVintage,
-        // Street
+        moonlightJenkins, godfatherWillis,
+        // Color (12)
+        polaroid600, sunsetGlow, popArt, crossProcess, fadedVintage,
+        tealOrangeHollywood, midnightBlue, coralReef, jadeMint,
+        amberGlow, pastelDream, vibrantSummer,
+        // Street (12)
         memphisEggleston, leiterRain,
-        joelMeyerowitz, alexWebb, fredHerzog, bruceDavidsonSubway
+        joelMeyerowitz, alexWebb, fredHerzog, bruceDavidsonSubway,
+        martinParr, stephenShore, winogrand, nanGoldin, robertFrank, fanHo,
+        // Landscape (12)
+        anselMountains, peterLikDramatic, mistyMorning, goldenVista, blueHour,
+        autumnVivid, snowscape, tropicalParadise, desertRed,
+        forestEmerald, michaelKennaQuiet, nickBrandtAfrica
     ]
 
     public static let neutral = Preset(
@@ -922,6 +932,846 @@ public enum BuiltinPresets {
             $0.hsl.orange.s = 18
             $0.hsl.orange.l = 5
             $0.hsl.yellow.l = 8
+        }
+    )
+
+    // MARK: - B&W additions (7)
+
+    public static let anselZone = Preset(
+        id: "ansel-zone",
+        name: "Ansel Zone",
+        category: "B&W",
+        description: "Adams Zone System — full tonal range, dramatic skies via blue darken.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 32
+            $0.tone.highlights = 8
+            $0.tone.shadows = -5
+            $0.tone.whites = 15
+            $0.tone.blacks = -28
+            $0.grain.amount = 12
+            $0.hsl.red.l = 5       // skin/rocks lift
+            $0.hsl.blue.l = -45    // dark dramatic skies
+            $0.hsl.aqua.l = -25
+        }
+    )
+
+    public static let highKeyBW = Preset(
+        id: "high-key-bw",
+        name: "High Key",
+        category: "B&W",
+        description: "Bright airy whites, soft shadows — fashion / wedding feel.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = -15
+            $0.tone.highlights = 25
+            $0.tone.shadows = 35
+            $0.tone.whites = 28
+            $0.tone.blacks = 12
+            $0.grain.amount = 8
+        }
+    )
+
+    public static let lowKeyBW = Preset(
+        id: "low-key-bw",
+        name: "Low Key",
+        category: "B&W",
+        description: "Dark moody portrait — deep shadows, sculpted highlights.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 45
+            $0.tone.highlights = -15
+            $0.tone.shadows = -45
+            $0.tone.whites = 8
+            $0.tone.blacks = -55
+            $0.grain.amount = 18
+            $0.hsl.red.l = 10  // skin retains structure
+        }
+    )
+
+    public static let platinumPalladium = Preset(
+        id: "platinum-palladium",
+        name: "Platinum",
+        category: "B&W",
+        description: "Warm-toned alt-process print look — soft, long tonal range.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 12
+            $0.tone.highlights = -8
+            $0.tone.shadows = 18
+            $0.tone.whites = -10
+            $0.tone.blacks = -8
+            $0.colorGrading.shadows.hue = 35
+            $0.colorGrading.shadows.sat = 18
+            $0.colorGrading.highlights.hue = 40
+            $0.colorGrading.highlights.sat = 12
+            $0.colorGrading.balance = 5
+            $0.grain.amount = 15
+        }
+    )
+
+    public static let documentaryReportage = Preset(
+        id: "documentary-reportage",
+        name: "Reportage",
+        category: "B&W",
+        description: "Press-photo neutral B&W — moderate contrast, full midtones.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 25
+            $0.tone.highlights = -12
+            $0.tone.shadows = 5
+            $0.tone.whites = 5
+            $0.tone.blacks = -22
+            $0.grain.amount = 22
+            $0.hsl.red.l = 5
+            $0.hsl.blue.l = -15
+        }
+    )
+
+    public static let architectureBW = Preset(
+        id: "architecture-bw",
+        name: "Architecture",
+        category: "B&W",
+        description: "Crisp B&W for buildings — strong micro-contrast, clean whites.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 38
+            $0.tone.highlights = -18
+            $0.tone.shadows = -10
+            $0.tone.whites = 22
+            $0.tone.blacks = -32
+            $0.detail.sharpAmount = 55
+            $0.grain.amount = 5
+            $0.hsl.blue.l = -30   // sky separation
+        }
+    )
+
+    public static let classicWeddingBW = Preset(
+        id: "classic-wedding-bw",
+        name: "Classic Wedding",
+        category: "B&W",
+        description: "Soft creamy B&W — flattering for skin, gentle on highlights.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 5
+            $0.tone.highlights = -22
+            $0.tone.shadows = 22
+            $0.tone.whites = -8
+            $0.tone.blacks = -12
+            $0.grain.amount = 14
+            $0.hsl.red.l = 12    // skin glow
+            $0.hsl.orange.l = 10
+        }
+    )
+
+    // MARK: - Film additions (2)
+
+    public static let portra160 = Preset(
+        id: "portra-160",
+        name: "Portra 160",
+        category: "Film",
+        description: "Lower-ISO Portra — even creamier skin, gentler grain than 400.",
+        operations: build {
+            $0.tone.contrast = -12
+            $0.tone.highlights = -18
+            $0.tone.shadows = 25
+            $0.tone.whites = -8
+            $0.tone.blacks = -5
+            $0.color.saturation = -15
+            $0.color.vibrance = 18
+            $0.colorGrading.shadows.hue = 35
+            $0.colorGrading.shadows.sat = 10
+            $0.colorGrading.highlights.hue = 42
+            $0.colorGrading.highlights.sat = 15
+            $0.colorGrading.balance = 8
+            $0.grain.amount = 10
+            $0.hsl.orange.s = -10
+            $0.hsl.orange.l = 10
+            $0.hsl.green.s = -18
+        }
+    )
+
+    public static let fujiPro400H = Preset(
+        id: "fuji-pro-400h",
+        name: "Pro 400H",
+        category: "Film",
+        description: "Cool pastel wedding film — minty greens, airy highlights.",
+        operations: build {
+            $0.tone.contrast = -8
+            $0.tone.highlights = -22
+            $0.tone.shadows = 22
+            $0.tone.whites = -12
+            $0.tone.blacks = -5
+            $0.color.saturation = -8
+            $0.color.vibrance = 15
+            $0.colorGrading.shadows.hue = 160
+            $0.colorGrading.shadows.sat = 12
+            $0.colorGrading.highlights.hue = 180
+            $0.colorGrading.highlights.sat = 8
+            $0.colorGrading.balance = -5
+            $0.grain.amount = 12
+            $0.hsl.green.s = -12
+            $0.hsl.aqua.s = 12
+            $0.hsl.blue.s = 8
+        }
+    )
+
+    // MARK: - Cinematic additions (2)
+
+    public static let moonlightJenkins = Preset(
+        id: "moonlight-jenkins",
+        name: "Moonlight",
+        category: "Cinematic",
+        description: "Magenta-violet beach scenes — Barry Jenkins / James Laxton.",
+        operations: build {
+            $0.tone.contrast = 18
+            $0.tone.highlights = -20
+            $0.tone.shadows = 12
+            $0.tone.blacks = -22
+            $0.color.saturation = 8
+            $0.color.vibrance = 18
+            $0.colorGrading.shadows.hue = 290
+            $0.colorGrading.shadows.sat = 32
+            $0.colorGrading.highlights.hue = 320
+            $0.colorGrading.highlights.sat = 22
+            $0.colorGrading.balance = -5
+            $0.grain.amount = 22
+            $0.hsl.red.s = 18
+            $0.hsl.magenta.s = 25
+            $0.hsl.blue.s = 18
+        }
+    )
+
+    public static let godfatherWillis = Preset(
+        id: "godfather-willis",
+        name: "Godfather",
+        category: "Cinematic",
+        description: "Gordon Willis sepia warmth — deep shadows, amber/gold highlights.",
+        operations: build {
+            $0.tone.contrast = 28
+            $0.tone.highlights = -12
+            $0.tone.shadows = -22
+            $0.tone.blacks = -38
+            $0.color.saturation = -22
+            $0.color.vibrance = 5
+            $0.colorGrading.shadows.hue = 30
+            $0.colorGrading.shadows.sat = 22
+            $0.colorGrading.shadows.lum = -3
+            $0.colorGrading.highlights.hue = 38
+            $0.colorGrading.highlights.sat = 32
+            $0.colorGrading.balance = 12
+            $0.grain.amount = 20
+            $0.hsl.orange.s = 18
+            $0.hsl.orange.l = 5
+            $0.hsl.yellow.l = 8
+        }
+    )
+
+    // MARK: - Color additions (7)
+
+    public static let tealOrangeHollywood = Preset(
+        id: "teal-orange-hollywood",
+        name: "Teal/Orange",
+        category: "Color",
+        description: "Classic complementary look — warm skin against cool surroundings.",
+        operations: build {
+            $0.tone.contrast = 25
+            $0.tone.highlights = -15
+            $0.tone.shadows = 8
+            $0.tone.blacks = -18
+            $0.color.saturation = 12
+            $0.color.vibrance = 18
+            $0.colorGrading.shadows.hue = 195
+            $0.colorGrading.shadows.sat = 32
+            $0.colorGrading.highlights.hue = 25
+            $0.colorGrading.highlights.sat = 30
+            $0.colorGrading.balance = 5
+            $0.grain.amount = 10
+            $0.hsl.orange.s = 22
+            $0.hsl.orange.l = 8
+            $0.hsl.aqua.s = 22
+            $0.hsl.blue.s = 18
+        }
+    )
+
+    public static let midnightBlue = Preset(
+        id: "midnight-blue",
+        name: "Midnight Blue",
+        category: "Color",
+        description: "Deep moody blue — twilight cool, lifted shadows for atmosphere.",
+        operations: build {
+            $0.tone.contrast = 18
+            $0.tone.highlights = -22
+            $0.tone.shadows = 18
+            $0.tone.blacks = -10
+            $0.color.saturation = -10
+            $0.color.vibrance = 15
+            $0.colorGrading.shadows.hue = 220
+            $0.colorGrading.shadows.sat = 38
+            $0.colorGrading.highlights.hue = 215
+            $0.colorGrading.highlights.sat = 22
+            $0.colorGrading.balance = -12
+            $0.grain.amount = 15
+            $0.hsl.blue.s = 25
+            $0.hsl.blue.l = -8
+            $0.hsl.purple.s = 22
+        }
+    )
+
+    public static let coralReef = Preset(
+        id: "coral-reef",
+        name: "Coral Reef",
+        category: "Color",
+        description: "Tropical pinks and oranges — sun-bleached coral palette.",
+        operations: build {
+            $0.tone.contrast = 8
+            $0.tone.highlights = -15
+            $0.tone.shadows = 18
+            $0.tone.blacks = -8
+            $0.color.saturation = 8
+            $0.color.vibrance = 22
+            $0.colorGrading.shadows.hue = 18
+            $0.colorGrading.shadows.sat = 25
+            $0.colorGrading.highlights.hue = 20
+            $0.colorGrading.highlights.sat = 28
+            $0.colorGrading.balance = 12
+            $0.grain.amount = 10
+            $0.hsl.red.s = 18
+            $0.hsl.orange.s = 28
+            $0.hsl.orange.l = 10
+            $0.hsl.aqua.s = 12
+        }
+    )
+
+    public static let jadeMint = Preset(
+        id: "jade-mint",
+        name: "Jade Mint",
+        category: "Color",
+        description: "Cool mint pastels — soft greens, milky highlights.",
+        operations: build {
+            $0.tone.contrast = -10
+            $0.tone.highlights = -22
+            $0.tone.shadows = 25
+            $0.tone.whites = -10
+            $0.tone.blacks = 5
+            $0.color.saturation = -15
+            $0.color.vibrance = 12
+            $0.colorGrading.shadows.hue = 150
+            $0.colorGrading.shadows.sat = 20
+            $0.colorGrading.highlights.hue = 165
+            $0.colorGrading.highlights.sat = 18
+            $0.colorGrading.balance = -8
+            $0.grain.amount = 12
+            $0.hsl.green.s = -8
+            $0.hsl.aqua.s = 22
+            $0.hsl.aqua.l = 12
+        }
+    )
+
+    public static let amberGlow = Preset(
+        id: "amber-glow",
+        name: "Amber Glow",
+        category: "Color",
+        description: "Honey-gold warmth across the frame — cozy interior lighting.",
+        operations: build {
+            $0.tone.contrast = 12
+            $0.tone.highlights = -18
+            $0.tone.shadows = 18
+            $0.tone.blacks = -15
+            $0.color.saturation = 10
+            $0.color.vibrance = 22
+            $0.colorGrading.shadows.hue = 35
+            $0.colorGrading.shadows.sat = 30
+            $0.colorGrading.highlights.hue = 45
+            $0.colorGrading.highlights.sat = 32
+            $0.colorGrading.balance = 15
+            $0.grain.amount = 12
+            $0.hsl.red.s = 12
+            $0.hsl.orange.s = 22
+            $0.hsl.orange.l = 8
+            $0.hsl.yellow.s = 18
+            $0.hsl.yellow.l = 5
+        }
+    )
+
+    public static let pastelDream = Preset(
+        id: "pastel-dream",
+        name: "Pastel Dream",
+        category: "Color",
+        description: "Soft dreamy pastels — desaturated, slightly hazy, romantic.",
+        operations: build {
+            $0.tone.contrast = -22
+            $0.tone.highlights = -25
+            $0.tone.shadows = 35
+            $0.tone.whites = -12
+            $0.tone.blacks = 28
+            $0.color.saturation = -38
+            $0.color.vibrance = 12
+            $0.colorGrading.shadows.hue = 320
+            $0.colorGrading.shadows.sat = 18
+            $0.colorGrading.highlights.hue = 35
+            $0.colorGrading.highlights.sat = 15
+            $0.colorGrading.balance = 0
+            $0.grain.amount = 18
+        }
+    )
+
+    public static let vibrantSummer = Preset(
+        id: "vibrant-summer",
+        name: "Vibrant Summer",
+        category: "Color",
+        description: "Punchy bright summer colors — saturated greens, pop blues.",
+        operations: build {
+            $0.tone.contrast = 22
+            $0.tone.highlights = -8
+            $0.tone.shadows = 5
+            $0.tone.whites = 8
+            $0.tone.blacks = -15
+            $0.color.saturation = 25
+            $0.color.vibrance = 18
+            $0.colorGrading.shadows.hue = 215
+            $0.colorGrading.shadows.sat = 12
+            $0.colorGrading.highlights.hue = 50
+            $0.colorGrading.highlights.sat = 18
+            $0.grain.amount = 6
+            $0.hsl.red.s = 18
+            $0.hsl.orange.s = 18
+            $0.hsl.yellow.s = 22
+            $0.hsl.green.s = 25
+            $0.hsl.blue.s = 22
+        }
+    )
+
+    // MARK: - Street additions (6)
+
+    public static let martinParr = Preset(
+        id: "martin-parr",
+        name: "Martin Parr",
+        category: "Street",
+        description: "Hyper-saturated British seaside — flash-lit kitsch documentary.",
+        operations: build {
+            $0.tone.contrast = 35
+            $0.tone.highlights = -12
+            $0.tone.shadows = -5
+            $0.tone.whites = 15
+            $0.tone.blacks = -22
+            $0.color.saturation = 38
+            $0.color.vibrance = 22
+            $0.colorGrading.shadows.hue = 220
+            $0.colorGrading.shadows.sat = 18
+            $0.colorGrading.highlights.hue = 50
+            $0.colorGrading.highlights.sat = 20
+            $0.grain.amount = 12
+            $0.hsl.red.s = 32
+            $0.hsl.orange.s = 30
+            $0.hsl.yellow.s = 30
+            $0.hsl.blue.s = 30
+            $0.hsl.magenta.s = 28
+        }
+    )
+
+    public static let stephenShore = Preset(
+        id: "stephen-shore",
+        name: "Stephen Shore",
+        category: "Street",
+        description: "Quiet uncommon places — flat light, gentle color, 1970s color print.",
+        operations: build {
+            $0.tone.contrast = 5
+            $0.tone.highlights = -18
+            $0.tone.shadows = 18
+            $0.tone.whites = -8
+            $0.tone.blacks = -8
+            $0.color.saturation = -8
+            $0.color.vibrance = 5
+            $0.colorGrading.shadows.hue = 28
+            $0.colorGrading.shadows.sat = 15
+            $0.colorGrading.highlights.hue = 42
+            $0.colorGrading.highlights.sat = 12
+            $0.colorGrading.balance = 5
+            $0.grain.amount = 18
+            $0.hsl.red.s = 8
+            $0.hsl.orange.l = 5
+            $0.hsl.green.s = -8
+        }
+    )
+
+    public static let winogrand = Preset(
+        id: "garry-winogrand",
+        name: "Winogrand",
+        category: "Street",
+        description: "High-contrast wide-angle B&W documentary — pioneering street.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 42
+            $0.tone.highlights = -25
+            $0.tone.shadows = -18
+            $0.tone.whites = 18
+            $0.tone.blacks = -42
+            $0.grain.amount = 32
+            $0.hsl.red.l = 5
+            $0.hsl.blue.l = -22
+        }
+    )
+
+    public static let nanGoldin = Preset(
+        id: "nan-goldin",
+        name: "Nan Goldin",
+        category: "Street",
+        description: "Intimate flash color — pushed reds, gritty interiors, raw.",
+        operations: build {
+            $0.tone.contrast = 22
+            $0.tone.highlights = -15
+            $0.tone.shadows = -12
+            $0.tone.blacks = -25
+            $0.color.saturation = 18
+            $0.color.vibrance = 5
+            $0.colorGrading.shadows.hue = 250
+            $0.colorGrading.shadows.sat = 18
+            $0.colorGrading.highlights.hue = 15
+            $0.colorGrading.highlights.sat = 25
+            $0.colorGrading.balance = -5
+            $0.grain.amount = 32
+            $0.hsl.red.s = 28
+            $0.hsl.red.l = 8
+            $0.hsl.orange.s = 22
+        }
+    )
+
+    public static let robertFrank = Preset(
+        id: "robert-frank",
+        name: "Robert Frank",
+        category: "Street",
+        description: "The Americans — somber documentary B&W, lifted blacks, dust feel.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 8
+            $0.tone.highlights = -15
+            $0.tone.shadows = 22
+            $0.tone.whites = -12
+            $0.tone.blacks = 8
+            $0.grain.amount = 38
+            $0.hsl.red.l = 0
+            $0.hsl.blue.l = -10
+        }
+    )
+
+    public static let fanHo = Preset(
+        id: "fan-ho",
+        name: "Fan Ho",
+        category: "Street",
+        description: "Hong Kong light & shadow B&W — geometric beams, dramatic chiaroscuro.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 38
+            $0.tone.highlights = -15
+            $0.tone.shadows = -32
+            $0.tone.whites = 22
+            $0.tone.blacks = -40
+            $0.grain.amount = 18
+            $0.hsl.red.l = 8
+            $0.hsl.blue.l = -25
+        }
+    )
+
+    // MARK: - Landscape (12 — new category)
+
+    public static let anselMountains = Preset(
+        id: "ansel-mountains",
+        name: "Ansel Mountains",
+        category: "Landscape",
+        description: "Adams Yosemite — dramatic sky darken, glowing peaks, full tonal range.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 38
+            $0.tone.highlights = 12
+            $0.tone.shadows = -8
+            $0.tone.whites = 22
+            $0.tone.blacks = -32
+            $0.grain.amount = 10
+            $0.hsl.red.l = 8
+            $0.hsl.orange.l = 5
+            $0.hsl.yellow.l = 0
+            $0.hsl.blue.l = -55     // dramatic dark sky
+            $0.hsl.aqua.l = -38
+        }
+    )
+
+    public static let peterLikDramatic = Preset(
+        id: "peter-lik",
+        name: "Peter Lik",
+        category: "Landscape",
+        description: "Hyper-real saturated landscapes — punchy reds and blues, gallery print.",
+        operations: build {
+            $0.tone.contrast = 38
+            $0.tone.highlights = -10
+            $0.tone.shadows = 12
+            $0.tone.whites = 12
+            $0.tone.blacks = -22
+            $0.color.saturation = 32
+            $0.color.vibrance = 25
+            $0.colorGrading.shadows.hue = 220
+            $0.colorGrading.shadows.sat = 18
+            $0.colorGrading.highlights.hue = 35
+            $0.colorGrading.highlights.sat = 22
+            $0.colorGrading.balance = 5
+            $0.grain.amount = 4
+            $0.hsl.red.s = 28
+            $0.hsl.orange.s = 25
+            $0.hsl.green.s = 28
+            $0.hsl.blue.s = 35
+            $0.hsl.aqua.s = 25
+            $0.detail.sharpAmount = 50
+        }
+    )
+
+    public static let mistyMorning = Preset(
+        id: "misty-morning",
+        name: "Misty Morning",
+        category: "Landscape",
+        description: "Soft fog atmosphere — low contrast, lifted blacks, cool muted tones.",
+        operations: build {
+            $0.tone.contrast = -25
+            $0.tone.highlights = -22
+            $0.tone.shadows = 38
+            $0.tone.whites = -22
+            $0.tone.blacks = 32
+            $0.color.saturation = -32
+            $0.color.vibrance = 8
+            $0.colorGrading.shadows.hue = 200
+            $0.colorGrading.shadows.sat = 15
+            $0.colorGrading.highlights.hue = 195
+            $0.colorGrading.highlights.sat = 8
+            $0.colorGrading.balance = -8
+            $0.grain.amount = 15
+            $0.hsl.green.s = -22
+            $0.hsl.blue.s = -10
+        }
+    )
+
+    public static let goldenVista = Preset(
+        id: "golden-vista",
+        name: "Golden Vista",
+        category: "Landscape",
+        description: "Sunrise/sunset warmth — rich oranges, soft shadow lift, glowing sky.",
+        operations: build {
+            $0.tone.contrast = 18
+            $0.tone.highlights = -22
+            $0.tone.shadows = 18
+            $0.tone.blacks = -12
+            $0.color.saturation = 18
+            $0.color.vibrance = 25
+            $0.colorGrading.shadows.hue = 25
+            $0.colorGrading.shadows.sat = 28
+            $0.colorGrading.highlights.hue = 38
+            $0.colorGrading.highlights.sat = 35
+            $0.colorGrading.balance = 18
+            $0.grain.amount = 8
+            $0.hsl.red.s = 22
+            $0.hsl.orange.s = 32
+            $0.hsl.orange.l = 8
+            $0.hsl.yellow.s = 25
+            $0.hsl.yellow.l = 5
+        }
+    )
+
+    public static let blueHour = Preset(
+        id: "blue-hour",
+        name: "Blue Hour",
+        category: "Landscape",
+        description: "Twilight after sunset — deep blue sky, warm city lights, cool atmosphere.",
+        operations: build {
+            $0.tone.contrast = 22
+            $0.tone.highlights = -25
+            $0.tone.shadows = 22
+            $0.tone.blacks = -15
+            $0.color.saturation = 12
+            $0.color.vibrance = 22
+            $0.colorGrading.shadows.hue = 220
+            $0.colorGrading.shadows.sat = 35
+            $0.colorGrading.highlights.hue = 30
+            $0.colorGrading.highlights.sat = 22
+            $0.colorGrading.balance = -15
+            $0.grain.amount = 12
+            $0.hsl.orange.s = 22  // warm windows
+            $0.hsl.blue.s = 28
+            $0.hsl.blue.l = -8
+            $0.hsl.purple.s = 22
+        }
+    )
+
+    public static let autumnVivid = Preset(
+        id: "autumn-vivid",
+        name: "Autumn Vivid",
+        category: "Landscape",
+        description: "Fall foliage — saturated reds, oranges, yellows; warm shadows.",
+        operations: build {
+            $0.tone.contrast = 25
+            $0.tone.highlights = -12
+            $0.tone.shadows = 5
+            $0.tone.blacks = -15
+            $0.color.saturation = 22
+            $0.color.vibrance = 28
+            $0.colorGrading.shadows.hue = 28
+            $0.colorGrading.shadows.sat = 22
+            $0.colorGrading.highlights.hue = 35
+            $0.colorGrading.highlights.sat = 18
+            $0.colorGrading.balance = 10
+            $0.grain.amount = 8
+            $0.hsl.red.s = 32
+            $0.hsl.red.l = -3
+            $0.hsl.orange.s = 35
+            $0.hsl.orange.l = 5
+            $0.hsl.yellow.s = 28
+            $0.hsl.green.s = -8   // deemphasize remaining green
+        }
+    )
+
+    public static let snowscape = Preset(
+        id: "snowscape",
+        name: "Snowscape",
+        category: "Landscape",
+        description: "Cold winter — bright clean snow, blue shadows, crisp air.",
+        operations: build {
+            $0.tone.contrast = 12
+            $0.tone.highlights = -8
+            $0.tone.shadows = 22
+            $0.tone.whites = 22
+            $0.tone.blacks = -15
+            $0.color.saturation = -10
+            $0.color.vibrance = 12
+            $0.colorGrading.shadows.hue = 220
+            $0.colorGrading.shadows.sat = 32
+            $0.colorGrading.highlights.hue = 215
+            $0.colorGrading.highlights.sat = 12
+            $0.colorGrading.balance = -18
+            $0.grain.amount = 5
+            $0.hsl.blue.s = 22
+            $0.hsl.aqua.s = 18
+            $0.detail.sharpAmount = 45
+        }
+    )
+
+    public static let tropicalParadise = Preset(
+        id: "tropical-paradise",
+        name: "Tropical Paradise",
+        category: "Landscape",
+        description: "Vivid beach — turquoise water, white sand, lush greens.",
+        operations: build {
+            $0.tone.contrast = 18
+            $0.tone.highlights = -12
+            $0.tone.shadows = 12
+            $0.tone.whites = 8
+            $0.tone.blacks = -10
+            $0.color.saturation = 25
+            $0.color.vibrance = 28
+            $0.colorGrading.shadows.hue = 200
+            $0.colorGrading.shadows.sat = 18
+            $0.colorGrading.highlights.hue = 45
+            $0.colorGrading.highlights.sat = 18
+            $0.colorGrading.balance = 5
+            $0.grain.amount = 5
+            $0.hsl.green.s = 28
+            $0.hsl.green.l = 5
+            $0.hsl.aqua.s = 38
+            $0.hsl.aqua.l = 8
+            $0.hsl.blue.s = 30
+        }
+    )
+
+    public static let desertRed = Preset(
+        id: "desert-red",
+        name: "Desert Red",
+        category: "Landscape",
+        description: "Red rock canyon — warm earth tones, deep amber, dust haze.",
+        operations: build {
+            $0.tone.contrast = 22
+            $0.tone.highlights = -12
+            $0.tone.shadows = 8
+            $0.tone.blacks = -18
+            $0.color.saturation = 18
+            $0.color.vibrance = 22
+            $0.colorGrading.shadows.hue = 18
+            $0.colorGrading.shadows.sat = 32
+            $0.colorGrading.highlights.hue = 28
+            $0.colorGrading.highlights.sat = 38
+            $0.colorGrading.balance = 22
+            $0.grain.amount = 10
+            $0.hsl.red.s = 28
+            $0.hsl.red.l = -3
+            $0.hsl.orange.s = 32
+            $0.hsl.orange.l = 5
+            $0.hsl.yellow.s = 18
+            // Desaturate the sky and shift its hue toward warm/dusty so
+            // the upper-sky region doesn't read as bright cyan against
+            // the warm ground.
+            $0.hsl.blue.h = -25
+            $0.hsl.blue.s = -38
+            $0.hsl.blue.l = -8
+            $0.hsl.aqua.s = -25
+        }
+    )
+
+    public static let forestEmerald = Preset(
+        id: "forest-emerald",
+        name: "Forest Emerald",
+        category: "Landscape",
+        description: "Lush green forest — rich foliage, mossy shadows, dappled light.",
+        operations: build {
+            $0.tone.contrast = 15
+            $0.tone.highlights = -22
+            $0.tone.shadows = 22
+            $0.tone.blacks = -15
+            $0.color.saturation = 12
+            $0.color.vibrance = 25
+            $0.colorGrading.shadows.hue = 130
+            $0.colorGrading.shadows.sat = 22
+            $0.colorGrading.highlights.hue = 60
+            $0.colorGrading.highlights.sat = 18
+            $0.colorGrading.balance = -5
+            $0.grain.amount = 10
+            $0.hsl.green.s = 32
+            $0.hsl.green.l = 8
+            $0.hsl.aqua.s = 18
+            $0.hsl.yellow.s = 18
+        }
+    )
+
+    public static let michaelKennaQuiet = Preset(
+        id: "michael-kenna",
+        name: "Michael Kenna",
+        category: "Landscape",
+        description: "Quiet long-exposure B&W — minimal, soft, zen-like.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = -8
+            $0.tone.highlights = -25
+            $0.tone.shadows = 28
+            $0.tone.whites = -18
+            $0.tone.blacks = 12
+            $0.grain.amount = 8
+            $0.hsl.red.l = 5
+            $0.hsl.blue.l = -8
+        }
+    )
+
+    public static let nickBrandtAfrica = Preset(
+        id: "nick-brandt",
+        name: "Nick Brandt",
+        category: "Landscape",
+        description: "African savanna B&W — sculpted tonal range, dramatic skies.",
+        operations: build {
+            $0.color.saturation = -100
+            $0.tone.contrast = 32
+            $0.tone.highlights = -8
+            $0.tone.shadows = -15
+            $0.tone.whites = 12
+            $0.tone.blacks = -32
+            $0.grain.amount = 18
+            $0.hsl.red.l = 12
+            $0.hsl.orange.l = 8
+            $0.hsl.yellow.l = 0
+            $0.hsl.blue.l = -38
+            $0.hsl.aqua.l = -28
         }
     )
 

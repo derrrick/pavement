@@ -5,12 +5,12 @@ struct GrainPanel: View {
     @Bindable var document: PavementDocument
 
     private let typeLabels: [(String, String)] = [
-        (GrainOp.typeFine,       "Fine"),
-        (GrainOp.typeCubic,      "Cubic (T-MAX)"),
-        (GrainOp.typeTabular,    "Tabular"),
+        (GrainOp.typeFine,       "Fine Grain"),
         (GrainOp.typeSilverRich, "Silver Rich"),
-        (GrainOp.typeSoft,       "Soft"),
-        (GrainOp.typeHarsh,      "Harsh (Pushed)"),
+        (GrainOp.typeSoft,       "Soft Grain"),
+        (GrainOp.typeCubic,      "Cubic Grains"),
+        (GrainOp.typeTabular,    "Tabular Grains"),
+        (GrainOp.typeHarsh,      "Harsh Grain"),
     ]
 
     var body: some View {
@@ -71,12 +71,12 @@ struct GrainPanel: View {
 
     private func typeDescription(for type: String) -> String {
         switch type {
-        case GrainOp.typeFine:       return "Modern digital grain — uniform per-pixel, crisp."
-        case GrainOp.typeCubic:      return "T-MAX cubic crystals — sharp, well-defined grain."
-        case GrainOp.typeTabular:    return "Anisotropic platelet — slightly elongated grain."
-        case GrainOp.typeSilverRich: return "Dense silver content — heavy, deeply-textured."
-        case GrainOp.typeSoft:       return "Diffuse portrait grain — atmospheric, low-contrast."
-        case GrainOp.typeHarsh:      return "Pushed film — extreme contrast, gritty clumps."
+        case GrainOp.typeFine:       return "Standard modern digital grain — very uniform."
+        case GrainOp.typeSilverRich: return "Dense silver halide black-and-white film — deep, textured."
+        case GrainOp.typeSoft:       return "Diffused, less sharp texture — often used for portraits."
+        case GrainOp.typeCubic:      return "Modern T-Grain (Kodak T-MAX) — flat tabular crystals, sharp."
+        case GrainOp.typeTabular:    return "Distinct platelet shape — similar to cubic, more elongated."
+        case GrainOp.typeHarsh:      return "High-contrast, gritty grain from pushed (high-ISO) film."
         default:                     return ""
         }
     }

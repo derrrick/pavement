@@ -18,7 +18,7 @@ public struct EditorView: View {
 
     public var body: some View {
         ZStack {
-            Color(white: 0.08)
+            Theme.surfaceInset
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -51,10 +51,10 @@ public struct EditorView: View {
                             if document.showBefore {
                                 Text("BEFORE")
                                     .font(.caption.weight(.semibold))
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
                                     .background(.regularMaterial, in: Capsule())
-                                    .padding(12)
+                                    .padding(Theme.paddingDefault)
                             }
                         }
                         .overlay { if showGrid { GridOverlay() } }
@@ -62,14 +62,16 @@ public struct EditorView: View {
                 }
                 .frame(minWidth: 480)
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: Theme.sectionSpacing) {
                         HistogramView(histogram: document.histogram)
                             .frame(height: 80)
-                        Divider()
+                            .background(Theme.surfaceInset)
+                            .clipShape(RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
                         sections(for: document)
                     }
-                    .padding(12)
+                    .padding(Theme.paddingDefault)
                 }
+                .background(Theme.surface)
                 .frame(minWidth: 320, idealWidth: 380, maxWidth: 480)
             }
         } else {
@@ -83,11 +85,9 @@ public struct EditorView: View {
         CollapsibleSection(title: "Presets") {
             PresetsPanel(document: document)
         }
-        Divider()
         CollapsibleSection(title: "Match Look", defaultExpanded: false) {
             MatchLookPanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "White Balance",
             isModified: ops.whiteBalance != WhiteBalanceOp(),
@@ -95,7 +95,6 @@ public struct EditorView: View {
         ) {
             WhiteBalancePanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Exposure",
             isModified: ops.exposure.ev != 0,
@@ -103,7 +102,6 @@ public struct EditorView: View {
         ) {
             ExposurePanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Tone",
             isModified: !ToneFilter.isIdentity(ops.tone),
@@ -111,7 +109,6 @@ public struct EditorView: View {
         ) {
             TonePanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Tone Curve",
             isModified: !ToneCurveFilter.isIdentity(ops.toneCurve.rgb),
@@ -119,7 +116,6 @@ public struct EditorView: View {
         ) {
             ToneCurvePanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Color",
             isModified: !ColorAdjustFilter.isIdentity(ops.color),
@@ -127,7 +123,6 @@ public struct EditorView: View {
         ) {
             ColorPanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "HSL",
             isModified: !HSLFilter.isIdentity(ops.hsl),
@@ -135,7 +130,6 @@ public struct EditorView: View {
         ) {
             HSLPanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Color Balance",
             isModified: ops.colorGrading != ColorGradingOp(),
@@ -143,7 +137,6 @@ public struct EditorView: View {
         ) {
             ColorBalancePanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Detail",
             isModified: ops.detail != DetailOp(),
@@ -151,7 +144,6 @@ public struct EditorView: View {
         ) {
             DetailPanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Grain",
             isModified: !GrainFilter.isIdentity(ops.grain),
@@ -160,7 +152,6 @@ public struct EditorView: View {
         ) {
             GrainPanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Crop",
             isModified: ops.crop != CropOp(),
@@ -169,7 +160,6 @@ public struct EditorView: View {
         ) {
             CropPanel(document: document)
         }
-        Divider()
         CollapsibleSection(
             title: "Lens",
             defaultExpanded: false
