@@ -130,10 +130,36 @@ struct ImageCanvas: NSViewRepresentable {
 
         func canvas(_ view: CanvasMTKView, didScroll event: NSEvent) {
             guard var state = viewerState?.wrappedValue else { return }
+            // If the canvas hasn't seen its first sync yet (image just
+            // arrived but updateNSView pass hasn't run), drive the sync
+            // here so the first scroll event is honoured instead of
+            // silently dropped because hasRenderableImage is false.
+            if state.imageExtent.width == 0 || state.viewportSize.width == 0 {
+                state.updateImage(extent: image?.extent, viewport: view.drawableSize)
+            }
+
+            // Tuned for "feels right":
+            //   - Mouse wheel (non-precise): ~10% per click in the
+            //     scroll direction — matches Photoshop / Capture One.
+            //   - Trackpad (precise): ~1% per scroll-delta unit, giving
+            //     smooth analog control over the whole 0.05x..8x range.
+            // Previous 1.0025 base produced <2% per wheel click which
+            // was easy to mistake for "not working at all."
             let precise = event.hasPreciseScrollingDeltas
-            let delta = precise ? event.scrollingDeltaY : event.deltaY * 8
-            guard delta != 0 else { return }
-            let factor = pow(1.0025, delta)
+            let raw = precise ? event.scrollingDeltaY : event.deltaY
+            guard raw != 0 else { return }
+            let factor: CGFloat
+            if precise {
+                factor = pow(1.01, raw)
+            } else {
+                // Non-precise wheels send small absolute deltas (often 1
+                // or fractional) — driving them through pow(1.10, raw)
+                // gives a consistent 10%-ish change per click in the
+                // scroll direction without runaway acceleration on
+                // high-momentum scrolls.
+                factor = pow(1.10, raw)
+            }
+
             state.zoom(by: factor, anchor: drawablePoint(for: event.locationInWindow, in: view))
             viewerState?.wrappedValue = state
             view.setNeedsDisplay(view.bounds)

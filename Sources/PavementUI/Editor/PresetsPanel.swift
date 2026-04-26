@@ -73,58 +73,20 @@ struct PresetsPanel: View {
     }
 
     private var categoryPicker: some View {
-        Menu {
+        // Native macOS Picker.menu — guaranteed system-rendered popup
+        // chevron and frame. Two prior attempts (custom Menu label with
+        // a chevron pill) didn't read as a dropdown for the user; this
+        // delegates the chrome to AppKit's NSPopUpButton via SwiftUI so
+        // the affordance is the standard one users already recognize.
+        Picker("Style library", selection: $state.selectedCategory) {
             ForEach(StyleBrowserCategory.allCases) { category in
-                Button {
-                    state.selectedCategory = category
-                } label: {
-                    HStack {
-                        Text(category.rawValue)
-                        if category == state.selectedCategory {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
+                Label(category.rawValue, systemImage: "square.stack.3d.up")
+                    .tag(category)
             }
-        } label: {
-            HStack(spacing: 0) {
-                Image(systemName: "square.stack.3d.up")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                    .padding(.leading, 10)
-                Text(state.selectedCategory.rawValue)
-                    .font(.caption.weight(.semibold))
-                    .padding(.leading, 6)
-                    .padding(.vertical, 8)
-                Spacer(minLength: 8)
-                // Heavy, visually-distinct dropdown affordance — accent
-                // tinted rounded square with a bold chevron, separated
-                // from the label by a hairline. Reads as "clickable
-                // popup" at a glance even on the darkest displays.
-                Rectangle()
-                    .fill(Theme.borderSubtle)
-                    .frame(width: 1)
-                ZStack {
-                    RoundedRectangle(cornerRadius: 5, style: .continuous)
-                        .fill(Color.accentColor.opacity(0.18))
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 13, weight: .heavy))
-                        .foregroundStyle(Color.accentColor)
-                }
-                .frame(width: 26, height: 26)
-                .padding(.trailing, 3)
-            }
-            .frame(minHeight: 32)
-            .background(Theme.surfaceInset, in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous)
-                    .stroke(Color.white.opacity(0.10), lineWidth: 1)
-            )
-            .contentShape(Rectangle())
         }
-        .menuStyle(.borderlessButton)
-        .menuIndicator(.hidden)
-        .buttonStyle(.plain)
+        .pickerStyle(.menu)
+        .labelsHidden()
+        .controlSize(.regular)
         .help("Switch style library")
         #if os(macOS)
         .cursorOnHover()
@@ -305,12 +267,13 @@ private struct StyleGroupSection<Content: View>: View {
             .background(Theme.surfaceInset.opacity(0.72), in: RoundedRectangle(cornerRadius: Theme.cornerRadius, style: .continuous))
             .hoverHighlight(cornerRadius: Theme.cornerRadius, tint: Theme.hoverTint.opacity(0.7))
 
+            // Expansion is instant — no `.transition` and no `.animation`
+            // on the parent. Filters appear/disappear immediately when
+            // the user toggles the chevron, matching Capture One.
             if isExpanded {
                 content()
-                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
-        .animation(.easeOut(duration: 0.14), value: isExpanded)
     }
 }
 
