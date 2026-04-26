@@ -56,14 +56,25 @@ final class StyleBrowserState {
     var selectedCategory: StyleBrowserCategory = .builtIn
     var searchText = ""
     var previewedStyleID: String?
-    // NOTE: do not self-assign inside `didSet`. The `@Observable` macro
-    // rewrites stored properties through the observation registrar, so
-    // `amount = clamped` re-enters the setter and recurses to a stack
-    // overflow when the user drags the strength slider. The slider is
-    // bound `in: 0...1`, so clamp at init and trust the binding.
+    // Hand-rolled Observation glue. An earlier version had `didSet { amount =
+    // clamped }`, which recursed to a stack overflow because @Observable
+    // routes stored-property writes through `withMutation`, defeating
+    // Swift's normal didSet-doesn't-recurse rule. Here the backing storage
+    // is @ObservationIgnored, so mutating `_amount` cannot re-enter the
+    // setter regardless of what the macro generates.
+    @ObservationIgnored private var _amount: Double = 1.0
     var amount: Double {
-        didSet {
-            defaults.set(amount, forKey: Self.amountKey)
+        get {
+            access(keyPath: \.amount)
+            return _amount
+        }
+        set {
+            let clamped = min(max(newValue, 0), 1)
+            guard clamped != _amount else { return }
+            withMutation(keyPath: \.amount) {
+                _amount = clamped
+            }
+            defaults.set(clamped, forKey: Self.amountKey)
         }
     }
 
@@ -79,7 +90,7 @@ final class StyleBrowserState {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let stored = defaults.object(forKey: Self.amountKey) as? Double ?? 1.0
-        self.amount = min(max(stored, 0), 1)
+        self._amount = min(max(stored, 0), 1)
         self.favorites = Set(defaults.stringArray(forKey: Self.favoritesKey) ?? [])
         self.recentStyleIDs = defaults.stringArray(forKey: Self.recentKey) ?? []
     }
